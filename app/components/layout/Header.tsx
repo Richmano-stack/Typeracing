@@ -33,7 +33,7 @@ const Header: React.FC = () => {
             className="text-3xl font-extrabold cursor-pointer transition duration-150"
             style={{ color: 'var(--accent)' }}
           >
-            <FontAwesomeIcon icon={faKeyboard} size='lg' /> <span className="ml-2">TypeRacer</span>
+            <FontAwesomeIcon icon={faKeyboard} size='lg' /> <span className="ml-2">TypeRace</span>
           </span>
         </Link>
 

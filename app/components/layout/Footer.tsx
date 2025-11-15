@@ -2,11 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Moon, Sun } from 'lucide-react'; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFacebook } from '@fortawesome/free-brands-svg-icons';
 import { faTwitter } from '@fortawesome/free-brands-svg-icons';
 import ThemeToggleButton from '../ui/ThemeToggleButton';
+import { faKeyboard } from '@fortawesome/free-solid-svg-icons';
 
 // Definition of legal and support links
 const legalLinks = [
@@ -45,7 +45,7 @@ const Footer: React.FC = () => {
                   className="text-2xl font-extrabold cursor-pointer mb-4 md:mb-0" 
                   style={{ color: 'var(--accent)' }} 
               >
-                  typeracing
+                  <FontAwesomeIcon icon={faKeyboard} size='lg' /> <span className="ml-2">TypeRace</span>
               </Link>
 
               {/* Copyright Text */}
