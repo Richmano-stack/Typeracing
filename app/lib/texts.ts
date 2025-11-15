@@ -1,0 +1,17 @@
+export const TYPING_TEXTS = [
+  "The quick brown fox jumps over the lazy dog, demonstrating the pangram principle in typography and font design.",
+  "Practice makes perfect. Consistency in typing helps improve accuracy and speed over time.",
+  "Welcome to the typing race! Your fingers dance across the keyboard as you compete for the highest score.",
+  "In the world of competitive typing, speed is essential, but accuracy is paramount for success.",
+  "Type faster, think clearer, and achieve excellence through dedication and constant practice.",
+  "The weather today is perfect for staying indoors and improving your typing skills with focused training.",
+  "Algorithms and data structures form the foundation of computer science and modern programming.",
+  "JavaScript revolutionized web development by enabling interactive experiences in the browser.",
+  "React components promote code reusability and maintainability in modern frontend development.",
+  "Type each character with precision, focus, and determination to overcome your previous records.",
+  "The art of typing requires muscle memory, concentration, and a genuine passion for improving oneself.",
+  "Every keystroke brings you closer to mastery. Never give up on your goals and dreams today.",
+  "Speed typing competitions have become increasingly popular worldwide among computer enthusiasts.",
+  "Learning new skills takes time, effort, and patience. Trust the process and enjoy the journey ahead.",
+  "The digital age demands skilled typists who can work efficiently and accurately under pressure.",
+]
