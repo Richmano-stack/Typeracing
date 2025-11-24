@@ -5,6 +5,7 @@ import { RefreshCw, Save, Trophy, Clock, Target, Zap } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useSession } from 'next-auth/react';
 import { saveGuestRace } from '@/lib/guestStats';
+import { useRouter } from 'next/navigation';
 
 const MAX_ERRORS = 10;
 
@@ -39,6 +40,7 @@ interface ServerStats {
 
 const QuickRacePage: React.FC = () => {
     const { data: session } = useSession();
+    const router = useRouter();
     const [raceState, setRaceState] = useState<RaceState>({
         text: '',
         textId: '',
@@ -101,6 +103,13 @@ const QuickRacePage: React.FC = () => {
         return () => clearInterval(id);
     }, [preCountdown, countdown]);
 
+    // Auto-focus input when race starts
+    useEffect(() => {
+        if (raceState.status === 'running') {
+            inputRef.current?.focus();
+        }
+    }, [raceState.status]);
+
     // Timer while running
     useEffect(() => {
         if (raceState.status !== 'running') return;
@@ -124,12 +133,11 @@ const QuickRacePage: React.FC = () => {
         const text = raceState.text;
         if (raceState.errors >= MAX_ERRORS && newValue.length > raceState.userInput.length) return;
 
-        let newStatus = raceState.status;
+        let newStatus: RaceState['status'] = raceState.status;
         let newStart = raceState.startTime;
-        if (newStatus === 'idle' && newValue.length > 0) {
-            newStatus = 'running';
-            newStart = Date.now();
-        }
+
+        // Note: The check for 'idle' was removed because of the early return above.
+        // If we ever want to support starting on typing, we need to remove the early return.
 
         let errors = 0;
         let correct = 0;
@@ -332,12 +340,20 @@ const QuickRacePage: React.FC = () => {
                             <p>Meilleur WPM: {guestStats.bestWpm}</p>
                         </div>
                     )}
-                    <button
-                        className="mt-4 bg-[var(--accent)] text-[var(--bg-base)] py-2 px-4 rounded"
-                        onClick={startNewRace}
-                    >
-                        Rejouer
-                    </button>
+                    <div className="flex justify-center gap-4 mt-4">
+                        <button
+                            className="bg-[var(--accent)] text-[var(--bg-base)] py-2 px-4 rounded hover:opacity-90 transition-opacity"
+                            onClick={startNewRace}
+                        >
+                            Rejouer
+                        </button>
+                        <button
+                            className="bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] py-2 px-4 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                            onClick={() => router.push('/dashboard')}
+                        >
+                            Quitter
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
