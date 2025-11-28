@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RefreshCw, Save, Trophy, Clock, Target, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
-import { saveGuestRace } from '@/lib/guestStats';
+import { useGuestStats } from '@/hooks/useGuestStats';
 import { useRouter } from 'next/navigation';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberCard from '@/components/ui/CyberCard';
@@ -34,6 +34,7 @@ interface Racer {
 
 export default function QuickRacePage() {
     const router = useRouter();
+    const { stats, saveRace } = useGuestStats();
     const [raceState, setRaceState] = useState<RaceState>({
         text: '',
         textId: '',
@@ -56,7 +57,6 @@ export default function QuickRacePage() {
     const [countdown, setCountdown] = useState<number>(0);
 
     const [isSaving, setIsSaving] = useState(false);
-    const [guestStats, setGuestStats] = useState<any>(null);
 
     // Initialise a new race
     const startNewRace = () => {
@@ -78,7 +78,6 @@ export default function QuickRacePage() {
         setPreCountdown(true);
         setCountdown(3); // Faster countdown for game feel
         setTimer(0);
-        setGuestStats(null);
         setIsSaving(false);
     };
 
@@ -175,9 +174,8 @@ export default function QuickRacePage() {
         const save = async () => {
             setIsSaving(true);
             try {
-                // Frontend-only: Save to local storage
-                const stats = saveGuestRace(raceState.wpm);
-                setGuestStats(stats);
+                // Frontend-only: Save to local storage via hook
+                saveRace(raceState.wpm, raceState.accuracy);
             } catch (e) {
                 console.error('Failed to save race', e);
             } finally {
@@ -185,7 +183,7 @@ export default function QuickRacePage() {
             }
         };
         save();
-    }, [raceState.status, raceState.wpm, isSaving]);
+    }, [raceState.status, raceState.wpm, raceState.accuracy, isSaving, saveRace]);
 
     // Render text with styling
     const renderText = useMemo(() => {
@@ -360,12 +358,12 @@ export default function QuickRacePage() {
                             </div>
                         </div>
 
-                        {guestStats && (
+                        {stats && (
                             <div className="mb-8 p-4 bg-[var(--bg-surface)] rounded border border-[var(--border)]">
                                 <h3 className="text-sm font-bold uppercase text-[var(--text-secondary)] mb-2">Personal Best</h3>
                                 <div className="flex justify-between items-center font-mono">
-                                    <span>Highest WPM: <span className="text-white">{guestStats.bestWpm}</span></span>
-                                    <span>Total Races: <span className="text-white">{guestStats.racesPlayed}</span></span>
+                                    <span>Highest WPM: <span className="text-white">{stats.bestWpm}</span></span>
+                                    <span>Total Races: <span className="text-white">{stats.racesPlayed}</span></span>
                                 </div>
                             </div>
                         )}
