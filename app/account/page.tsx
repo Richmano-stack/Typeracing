@@ -1,28 +1,17 @@
+"use client"
+
 import React from 'react';
-import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
-import { authOptions } from '@/api/auth/[...nextauth]/route';
-import { getUserProfile } from '@/lib/data';
 import { User, Calendar, Clock, Mail } from 'lucide-react';
 
-export default async function AccountPage() {
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-        redirect('/login');
-    }
-
-    // Fetch full user profile from database
-    const user = await getUserProfile(session.user.id);
-
-    if (!user) {
-        // Handle case where session exists but user not found in DB (rare)
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p className="text-red-500">User profile not found.</p>
-            </div>
-        );
-    }
+export default function AccountPage() {
+    // Frontend-only: Use mock user data
+    const user = {
+        name: 'Demo Racer',
+        email: 'demo@typeracing.com',
+        image: null,
+        createdAt: new Date('2024-01-01'),
+        lastLogin: new Date(),
+    };
 
     return (
         <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] py-12 px-4 sm:px-6 lg:px-8">

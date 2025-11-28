@@ -2,11 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFacebook } from '@fortawesome/free-brands-svg-icons';
-import { faTwitter } from '@fortawesome/free-brands-svg-icons';
-import ThemeToggleButton from '../ui/ThemeToggleButton';
-import { faKeyboard } from '@fortawesome/free-solid-svg-icons';
+import { Terminal, Twitter, Facebook, Github } from 'lucide-react';
 
 // Definition of legal and support links
 const legalLinks = [
@@ -16,81 +12,67 @@ const legalLinks = [
 ];
 
 const socialLinks = [
-
-    { name: 'Twitter/X', href: 'https://twitter.com/your_account', icon: faTwitter},
-    { name: 'Facebook', href: 'https://facebook.com/your_page', icon: faFacebook },
+  { name: 'Twitter/X', href: 'https://twitter.com', icon: Twitter },
+  { name: 'Facebook', href: 'https://facebook.com', icon: Facebook },
+  { name: 'GitHub', href: 'https://github.com', icon: Github },
 ];
 
 const Footer: React.FC = () => {
   return (
-    <>
-      <footer 
-        className="py-10 mt-16" 
-        style={{ 
-            backgroundColor: 'var(--bg-surface)', 
-            borderTop: '1px solid var(--border)' 
-        }}
-      >
-        <div className="container mx-auto px-4 text-center">
-          
-          {/* Main Section: Logo, Copyright, and Social Links */}
-          <div 
-              className="flex flex-col md:flex-row justify-between items-center border-b pb-6 mb-6" 
-              style={{ borderBottomColor: 'var(--border)' }}
-          >
-              
-              {/* Logo/Brand */}
-              <Link 
-                  href="/" 
-                  className="text-2xl font-extrabold cursor-pointer mb-4 md:mb-0" 
-                  style={{ color: 'var(--accent)' }} 
+    <footer className="py-12 mt-16 border-t border-[var(--border)] bg-[var(--bg-surface)] relative z-10">
+      <div className="container mx-auto px-4">
+
+        <div className="flex flex-col md:flex-row justify-between items-center pb-8 mb-8 border-b border-[var(--border)]">
+
+          {/* Logo/Brand */}
+          <Link href="/" className="group flex items-center gap-2 mb-4 md:mb-0">
+            <div className="p-2 border border-[var(--primary)] rounded-sm group-hover:bg-[rgba(0,243,255,0.1)] transition-colors">
+              <Terminal size={24} className="text-[var(--primary)]" />
+            </div>
+            <span className="text-2xl font-black tracking-tighter text-white uppercase group-hover:text-[var(--primary)] transition-colors">
+              Type<span className="text-[var(--primary)]">Race</span>
+            </span>
+          </Link>
+
+          {/* Social Media Icons */}
+          <div className="flex space-x-6">
+            {socialLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors hover:scale-110 transform duration-200"
+                aria-label={link.name}
               >
-                  <FontAwesomeIcon icon={faKeyboard} size='lg' /> <span className="ml-2">TypeRace</span>
-              </Link>
-
-              {/* Copyright Text */}
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  &copy; 2025 Richmano NASY. All rights reserved.
-              </p>
-
-              {/* Social Media Icons */}
-              <div className="flex space-x-4 mt-4 md:mt-0">
-                  {socialLinks.map((link) => (
-                      <a 
-                          key={link.name} 
-                          href={link.href} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="transition hover:opacity-80"
-                          style={{ color: 'var(--text-secondary)' }}
-                          aria-label={link.name}
-                      >
-                          <FontAwesomeIcon icon={link.icon} size="lg" />
-                      </a>
-                  ))}
-              </div>
-
+                <link.icon size={24} />
+              </a>
+            ))}
           </div>
 
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm font-mono">
+          {/* Copyright Text */}
+          <p className="text-[var(--text-muted)]">
+            &copy; 2025 Richmano NASY. ALL RIGHTS RESERVED.
+          </p>
+
           {/* Secondary Section: Legal Links */}
-          <div className="flex justify-center space-x-6">
+          <div className="flex space-x-6">
             {legalLinks.map((link) => (
-              <Link 
-                  key={link.name} 
-                  href={link.href} 
-                  className="text-sm cursor-pointer hover:underline"
-                  style={{ color: 'var(--text-secondary)' }}
+              <Link
+                key={link.name}
+                href={link.href}
+                className="text-[var(--text-secondary)] hover:text-white transition-colors uppercase tracking-wider"
               >
-                  {link.name}
+                {link.name}
               </Link>
             ))}
           </div>
         </div>
-      </footer>
-      
-      {/* NEW: Theme Toggle Button Component (Outside main footer for fixed positioning) */}
-      <ThemeToggleButton />
-    </>
+      </div>
+    </footer>
   );
 };
 

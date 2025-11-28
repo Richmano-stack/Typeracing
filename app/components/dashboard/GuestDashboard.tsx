@@ -3,86 +3,77 @@
 import React from 'react';
 import Link from 'next/link';
 import { useGuestStats } from '@/hooks/useGuestStats';
-import { Trophy, Zap, Target, Flame, AlertCircle } from 'lucide-react';
+import { Trophy, Zap, Target, Flame, AlertCircle, Play } from 'lucide-react';
+import CyberCard from '@/components/ui/CyberCard';
+import CyberButton from '@/components/ui/CyberButton';
 
 const GuestDashboard: React.FC = () => {
     const { stats } = useGuestStats();
 
     return (
-        <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] py-8 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-4xl mx-auto space-y-8">
+        <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-6xl mx-auto space-y-8">
 
-                {/* Guest Warning Banner */}
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start space-x-3">
-                    <AlertCircle className="text-yellow-500 shrink-0 mt-0.5" size={20} />
-                    <div>
-                        <h3 className="font-semibold text-yellow-500">Guest Mode</h3>
-                        <p className="text-sm text-[var(--text-secondary)] mt-1">
-                            You are currently playing as a guest. Your stats are temporary and will be lost if you refresh the page.
-                            <Link href="/register" className="text-[var(--accent)] hover:underline ml-1 font-medium">
-                                Create an account
-                            </Link> to save your progress permanently.
-                        </p>
+                {/* Welcome / CTA Banner */}
+                <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] p-8 md:p-12 text-center">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50" />
+
+                    <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-white mb-4"
+                        style={{ textShadow: '0 0 20px rgba(0,243,255,0.3)' }}>
+                        Ready to Race?
+                    </h1>
+                    <p className="text-[var(--text-secondary)] font-mono mb-8 max-w-2xl mx-auto">
+                        INITIATE TYPING SEQUENCE. TEST YOUR REFLEXES AGAINST THE GRID.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                        <Link href="/race">
+                            <CyberButton size="lg" glow>
+                                <Play size={20} />
+                                <span>Quick Race</span>
+                            </CyberButton>
+                        </Link>
+                        <Link href="/register">
+                            <CyberButton variant="secondary" size="lg">
+                                <span>Create Profile</span>
+                            </CyberButton>
+                        </Link>
                     </div>
+                </div>
+
+                {/* Guest Warning */}
+                <div className="flex items-center justify-center gap-2 text-[var(--text-muted)] text-sm font-mono border border-[var(--border)] p-2 rounded bg-black/20">
+                    <AlertCircle size={14} className="text-[var(--secondary)]" />
+                    <span>GUEST MODE: DATA NOT PERSISTED PERMANENTLY</span>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Races Played */}
-                    <div className="bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border)] shadow-sm">
-                        <div className="flex items-center space-x-3 mb-2">
-                            <Trophy size={20} className="text-blue-500" />
-                            <h3 className="text-[var(--text-secondary)] font-medium">Races</h3>
-                        </div>
-                        <p className="text-3xl font-bold">{stats.racesPlayed}</p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <CyberCard title="Races" icon={<Trophy size={24} />}>
+                        <p className="text-4xl font-black text-white">{stats.racesPlayed}</p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Completed</p>
+                    </CyberCard>
 
-                    {/* Best WPM */}
-                    <div className="bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border)] shadow-sm">
-                        <div className="flex items-center space-x-3 mb-2">
-                            <Zap size={20} className="text-yellow-500" />
-                            <h3 className="text-[var(--text-secondary)] font-medium">Best WPM</h3>
-                        </div>
-                        <p className="text-3xl font-bold">{stats.bestWpm}</p>
-                    </div>
+                    <CyberCard title="Best WPM" icon={<Zap size={24} />}>
+                        <p className="text-4xl font-black text-[var(--primary)]" style={{ textShadow: '0 0 10px rgba(0,243,255,0.5)' }}>
+                            {stats.bestWpm}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Peak Speed</p>
+                    </CyberCard>
 
-                    {/* Accuracy */}
-                    <div className="bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border)] shadow-sm">
-                        <div className="flex items-center space-x-3 mb-2">
-                            <Target size={20} className="text-green-500" />
-                            <h3 className="text-[var(--text-secondary)] font-medium">Accuracy</h3>
-                        </div>
-                        <p className="text-3xl font-bold">{stats.accuracy}%</p>
-                    </div>
+                    <CyberCard title="Accuracy" icon={<Target size={24} />}>
+                        <p className="text-4xl font-black text-[var(--success)]">
+                            {stats.accuracy}%
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Precision</p>
+                    </CyberCard>
 
-                    {/* Streak */}
-                    <div className="bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border)] shadow-sm">
-                        <div className="flex items-center space-x-3 mb-2">
-                            <Flame size={20} className="text-orange-500" />
-                            <h3 className="text-[var(--text-secondary)] font-medium">Streak</h3>
-                        </div>
-                        <p className="text-3xl font-bold">{stats.streak}</p>
-                    </div>
-                </div>
-
-                {/* CTA Section */}
-                <div className="bg-[var(--bg-surface)] rounded-xl p-8 text-center border border-[var(--border)] shadow-lg">
-                    <h2 className="text-2xl font-bold mb-4">Ready to go pro?</h2>
-                    <p className="text-[var(--text-secondary)] mb-6 max-w-lg mx-auto">
-                        Join thousands of other racers on the leaderboard. Track your progress, compete in tournaments, and customize your profile.
-                    </p>
-                    <div className="flex justify-center space-x-4">
-                        <Link href="/register">
-                            <button className="bg-[var(--accent)] text-[var(--bg-base)] font-bold py-3 px-8 rounded-lg shadow-lg hover:opacity-90 transition-opacity transform hover:scale-105">
-                                Create Account
-                            </button>
-                        </Link>
-                        <Link href="/login">
-                            <button className="bg-[var(--bg-card)] text-[var(--text-primary)] font-semibold py-3 px-8 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-base)] transition-colors">
-                                Login
-                            </button>
-                        </Link>
-                    </div>
+                    <CyberCard title="Streak" icon={<Flame size={24} />}>
+                        <p className="text-4xl font-black text-[var(--secondary)]">
+                            {stats.streak}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Consecutive</p>
+                    </CyberCard>
                 </div>
 
             </div>

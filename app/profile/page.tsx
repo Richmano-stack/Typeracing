@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React from 'react';
 import { User, Activity, Trophy, Flag } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 
 // StatCard component
 const StatCard = ({ icon: Icon, title, value }: { icon: any; title: string; value: React.ReactNode }) => (
@@ -15,30 +13,14 @@ const StatCard = ({ icon: Icon, title, value }: { icon: any; title: string; valu
 );
 
 const ProfilePage = () => {
-    const { data: session, status } = useSession();
-    const router = useRouter();
-    const isLoggedIn = status === 'authenticated';
-    const user = session?.user;
-
-    // Redirect to login if not authenticated
-    useEffect(() => {
-        if (status === 'unauthenticated') {
-            router.push('/login');
-        }
-    }, [status, router]);
-
-    if (!isLoggedIn) {
-        return null; // or a loading spinner
-    }
-
-    // Use real user data if available, otherwise fallback to zeros
+    // Frontend-only: Use mock user data
     const displayUser = {
-        username: user?.name || '',
-        bestWpm: (user as any)?.bestWpm ?? 0,
-        avgWpm: (user as any)?.avgWpm ?? 0,
-        racesCompleted: (user as any)?.racesCompleted ?? 0,
-        accuracy: (user as any)?.accuracy ?? 0,
-        joinedDate: (user as any)?.createdAt ? new Date((user as any).createdAt).toLocaleDateString() : '',
+        username: 'Demo Racer',
+        bestWpm: 0,
+        avgWpm: 0,
+        racesCompleted: 0,
+        accuracy: 0,
+        joinedDate: new Date().toLocaleDateString(),
     };
 
     return (

@@ -2,67 +2,55 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Rocket } from 'lucide-react';
-import { faKeyboard } from '@fortawesome/free-solid-svg-icons';
+import { Rocket, Terminal } from 'lucide-react';
+import CyberButton from '@/components/ui/CyberButton';
 
 const HeaderGuest: React.FC = () => {
   return (
     <header
-      className="fixed top-0 w-full z-50 shadow-sm backdrop-blur-sm"
+      className="fixed top-0 w-full z-50 backdrop-blur-md border-b border-[var(--border)]"
       style={{
-        backgroundColor: 'rgba(var(--bg-surface-rgb), 0.8)',
-        borderBottom: '1px solid var(--border)',
+        backgroundColor: 'rgba(5, 5, 5, 0.8)',
       }}
     >
-      <div className="container mx-auto flex justify-between items-center p-4">
+      <div className="container mx-auto flex justify-between items-center h-16 px-4">
 
         {/* Logo/Brand */}
-        <Link href="/" passHref>
-          <span
-            className="text-3xl font-extrabold cursor-pointer transition duration-150 flex items-center"
-            style={{ color: 'var(--accent)' }}
-          >
-            <FontAwesomeIcon icon={faKeyboard} size='lg' /> <span className="ml-2">TypeRace</span>
+        <Link href="/" className="group flex items-center gap-2">
+          <div className="p-2 border border-[var(--primary)] rounded-sm group-hover:bg-[rgba(0,243,255,0.1)] transition-colors">
+            <Terminal size={20} className="text-[var(--primary)]" />
+          </div>
+          <span className="text-xl font-black tracking-tighter text-white uppercase group-hover:text-[var(--primary)] transition-colors">
+            Type<span className="text-[var(--primary)]">Race</span>
           </span>
         </Link>
 
-        {/* ACTIONS CONTAINER */}
-        <div className="flex items-center space-x-4 md:space-x-6">
+        {/* Navigation */}
+        <nav className="hidden md:flex items-center gap-8">
+          {['Leaderboard', 'About'].map((item) => (
+            <Link
+              key={item}
+              href={`/${item.toLowerCase()}`}
+              className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors relative group"
+            >
+              {item}
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--primary)] transition-all group-hover:w-full" />
+            </Link>
+          ))}
+        </nav>
 
-          {/* Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium">
-              Home
-            </Link>
-            <Link href="/leaderboard" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium">
-              Leaderboard
-            </Link>
-            <Link href="/about" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium">
-              About
-            </Link>
-          </div>
-
-          {/* Auth Buttons */}
-          <div className="flex items-center space-x-4">
-            <Link href="/login" passHref>
-              <button
-                className="font-semibold py-2 px-4 rounded-md transition duration-200 hover:text-[var(--accent)] text-[var(--text-secondary)]"
-              >
-                Login
-              </button>
-            </Link>
-            <Link href="/register" passHref>
-              <button
-                className="font-bold py-2 px-5 rounded-md shadow-md transition duration-150 transform hover:scale-105"
-                style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }}
-              >
-                Sign Up
-              </button>
-            </Link>
-          </div>
-
+        {/* Auth Buttons */}
+        <div className="flex items-center gap-4">
+          <Link href="/login" className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors">
+            Login
+          </Link>
+          <Link href="/register">
+            <CyberButton size="sm" glow={false}>
+              Join Grid
+            </CyberButton>
+          </Link>
         </div>
+
       </div>
     </header>
   );

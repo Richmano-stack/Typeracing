@@ -1,134 +1,106 @@
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
-import { Play, Users, Brain, TrendingUp } from 'lucide-react'; 
+import { Play, Users, Brain, TrendingUp, Zap, Terminal } from 'lucide-react';
+import CyberButton from '@/components/ui/CyberButton';
+import CyberCard from '@/components/ui/CyberCard';
 
-// Definition of the three primary actions (unchanged)
 const actionCards = [
   {
-    title: 'Quick Multiplayer Race',
-    description: "Compete against racers from around the globe instantly.",
+    title: 'Quick Race',
+    description: "Compete against the grid instantly.",
     href: '/race',
-    icon: Play,
+    icon: Zap,
     isPrimary: true,
   },
   {
-    title: 'Create a Private Race',
-    description: "Invite your friends with a unique link for a friendly race.",
+    title: 'Private Lobby',
+    description: "Challenge friends to a duel.",
     href: '/create',
     icon: Users,
     isPrimary: false,
   },
   {
-    title: 'Practice Yourself Mode',
-    description: "Focus on precision and race against your previous best performances.",
+    title: 'Solo Drill',
+    description: "Hone your reflexes in isolation.",
     href: '/practice',
     icon: Brain,
     isPrimary: false,
   },
 ];
 
-// Reusable card component (unchanged)
-interface ActionCardProps {
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ElementType;
-  isPrimary: boolean;
-}
-
-const ActionCard: React.FC<ActionCardProps> = ({ title, description, href, icon: Icon, isPrimary }) => {
-    
-  const primaryStyle = isPrimary 
-    ? { backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }
-    : { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' };
-
-  const hoverEffect = isPrimary 
-    ? 'hover:scale-[1.03]'
-    : 'hover:border-accent hover:shadow-lg';
-    
-  const accentColor = isPrimary ? 'var(--bg-base)' : 'var(--accent)';
-
-  return (
-    <Link href={href} passHref>
-      <div 
-        className={`ui-card flex flex-col justify-between p-6 cursor-pointer transition transform duration-300 ${hoverEffect} h-full`}
-        style={primaryStyle}
-      >
-        <div className="flex items-center space-x-3 mb-3">
-          <Icon size={32} style={{ color: accentColor }} />
-          <h3 className={`text-2xl font-bold ${isPrimary ? 'text-black' : 'text-primary'}`}>
-            {title}
-          </h3>
-        </div>
-        <p className={`mt-2 ${isPrimary ? 'text-gray-800' : 'text-secondary'}`}>
-          {description}
-        </p>
-      </div>
-    </Link>
-  );
-};
-
 const HeroSection: React.FC = () => {
   return (
-    <section className="flex flex-col items-center justify-center pt-10 pb-20 px-4 text-center">
-      
-      {/* Incentive Headings */}
-      <div className="max-w-5xl">
-        <h1 className="text-6xl sm:text-7xl lg:text-8xl font-black leading-tight mb-4" style={{ color: 'var(--text-primary)' }}>
-          Master the Keyboard. 
-          <span className="text-accent text-shadow-md inline-block" style={{ color: 'var(--accent)' }}> Beat Your Friends.</span>
-        </h1>
-        <h2 className="text-xl sm:text-2xl font-light" style={{ color: 'var(--text-secondary)' }}>
-          The competitive online typing game.
-        </h2>
-      </div>
+    <section className="min-h-screen flex flex-col items-center justify-center pt-20 pb-20 px-4 text-center relative z-10">
 
-      {/* Primary Call to Action (CTA) - Isolated for high visibility */}
-      <Link href={actionCards[0].href} passHref>
-        <button
-          className="mt-12 w-full max-w-lg font-extrabold py-6 px-10 rounded-xl shadow-2xl text-2xl transition duration-300 transform hover:scale-[1.02] flex items-center justify-center space-x-3"
-          style={{ 
-            backgroundColor: 'var(--accent)', 
-            color: 'var(--bg-base)',
-            boxShadow: '0 0 40px rgba(0, 255, 166, 0.5)', 
-          }}
-        >
-          <Play size={28} />
-          <span>{actionCards[0].title}</span>
-        </button>
-      </Link>
-      
-      {/* NEW: Create an Account CTA */}
-      <div className="mt-4 flex flex-col items-center">
-          <Link href="/register" passHref>
-            <span 
-              className="text-lg font-semibold cursor-pointer hover:underline"
-              style={{ color: 'var(--accent)' }}
-            >
-              🚀 Create a free account to save your stats!
-            </span>
-          </Link>
-      </div>
+      {/* Hero Content */}
+      <div className="max-w-5xl mb-12">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[var(--primary)] bg-[rgba(0,243,255,0.1)] text-[var(--primary)] font-mono text-xs mb-6 animate-pulse">
+          <Terminal size={12} />
+          <span>SYSTEM ONLINE // READY FOR INPUT</span>
+        </div>
 
-      {/* Subtext under CTA (Moved down) */}
-      <p className="mt-4 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-          Over <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>300 races</span> launched in the last hour.
-      </p>
-
-
-      {/* Grid of Secondary Options */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-12">
-        {actionCards.slice(1).map((card) => ( 
-          <ActionCard key={card.title} {...card} />
-        ))}
-      </div>
-
-      {/* Social Proof Section (Below Cards) */}
-      <div className="mt-16 flex items-center space-x-2" style={{ color: 'var(--text-secondary)' }}>
-          <TrendingUp size={24} style={{ color: 'var(--accent)' }} />
-          <span className="text-xl">
-            <strong style={{ color: 'var(--accent)' }}>128 racers</strong> are online. | Today's Record: <strong style={{ color: 'var(--text-primary)' }}>150 WPM</strong>
+        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black uppercase tracking-tighter leading-none mb-6 text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+          Master the <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] drop-shadow-[0_0_10px_rgba(0,243,255,0.3)]">
+            Digital Flow
           </span>
+        </h1>
+
+        <p className="text-xl sm:text-2xl font-mono text-[var(--text-secondary)] max-w-2xl mx-auto mb-10">
+          The ultimate competitive typing protocol. <br />
+          <span className="text-white">Speed is your only currency.</span>
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          <Link href="/race">
+            <CyberButton size="lg" glow className="text-xl px-12 py-6">
+              <Play size={24} />
+              <span>Initiate Race</span>
+            </CyberButton>
+          </Link>
+
+          <Link href="/register">
+            <CyberButton variant="secondary" size="lg" className="text-xl px-12 py-6">
+              <span>Create Profile</span>
+            </CyberButton>
+          </Link>
+        </div>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="flex items-center gap-4 text-[var(--text-secondary)] font-mono text-sm mb-20 bg-black/40 px-6 py-3 rounded-full border border-[var(--border)] backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={16} className="text-[var(--success)]" />
+          <span className="text-white font-bold">128</span>
+          <span>ACTIVE PILOTS</span>
+        </div>
+        <span className="text-[var(--border)]">|</span>
+        <div>
+          RECORD: <span className="text-[var(--primary)] font-bold">150 WPM</span>
+        </div>
+      </div>
+
+      {/* Feature Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
+        {actionCards.map((card) => (
+          <Link key={card.title} href={card.href} className="group">
+            <CyberCard className="h-full transition-transform duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_0_30px_rgba(0,243,255,0.1)]">
+              <div className="flex flex-col items-center text-center h-full">
+                <div className={`p-4 rounded-full mb-4 ${card.isPrimary ? 'bg-[var(--primary)] text-black' : 'bg-[rgba(255,255,255,0.05)] text-[var(--primary)]'}`}>
+                  <card.icon size={32} />
+                </div>
+                <h3 className="text-2xl font-black uppercase tracking-wider text-white mb-2">
+                  {card.title}
+                </h3>
+                <p className="text-[var(--text-secondary)] font-mono text-sm">
+                  {card.description}
+                </p>
+              </div>
+            </CyberCard>
+          </Link>
+        ))}
       </div>
 
     </section>

@@ -1,195 +1,93 @@
-"use client"
+"use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { LogIn, Mail, Lock } from 'lucide-react';
-import { faGithub, faGoogle } from '@fortawesome/free-brands-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { signIn } from 'next-auth/react';
+import { LogIn } from 'lucide-react';
+import CyberCard from '@/components/ui/CyberCard';
+import CyberInput from '@/components/ui/CyberInput';
+import CyberButton from '@/components/ui/CyberButton';
 
-const LoginPage: React.FC = () => {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
 
-  // Get error from URL (if redirected from failed auth)
-  const urlError = searchParams.get('error');
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-
-    try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Invalid email or password');
-        setIsLoading(false);
-      } else {
-        // Successful login - redirect to profile
-        router.push('/profile');
-        router.refresh();
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleOAuthLogin = async (provider: 'github' | 'google') => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await signIn(provider, {
-        callbackUrl: '/profile',
-      });
-    } catch (err) {
-      setError(`Failed to sign in with ${provider}`);
-      setIsLoading(false);
-    }
+    // Simulate login delay
+    setTimeout(() => {
+      router.push('/dashboard');
+    }, 1000);
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4">
-
-      <div
-        className="w-full max-w-md ui-card p-8 md:p-10 text-center"
-        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-
-        <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--accent)' }}>
-          <LogIn className="inline mr-2" size={30} /> Sign In
-        </h1>
-        <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>
-          Welcome back, racer.
-        </p>
-
-        {/* Error Message */}
-        {(error || urlError) && (
-          <div
-            className="mb-6 p-3 rounded-lg border"
-            style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              borderColor: 'rgba(239, 68, 68, 0.3)',
-              color: '#ef4444'
-            }}
-          >
-            {error || 'Authentication failed. Please try again.'}
-          </div>
-        )}
-
-        {/* --- EMAIL/PASSWORD FORM --- */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-
-          {/* Email Input */}
-          <div>
-            <label className="sr-only" htmlFor="email">Email</label>
-            <div
-              className="flex items-center p-3 rounded-lg border"
-              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-            >
-              <Mail size={20} className="mr-3" style={{ color: 'var(--text-muted)' }} />
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Email Address"
-                required
-                disabled={isLoading}
-                className="w-full bg-transparent focus:outline-none"
-                style={{ color: 'var(--text-primary)' }}
-              />
-            </div>
-          </div>
-
-          {/* Password Input */}
-          <div>
-            <label className="sr-only" htmlFor="password">Password</label>
-            <div
-              className="flex items-center p-3 rounded-lg border"
-              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-            >
-              <Lock size={20} className="mr-3" style={{ color: 'var(--text-muted)' }} />
-              <input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Password"
-                required
-                disabled={isLoading}
-                className="w-full bg-transparent focus:outline-none"
-                style={{ color: 'var(--text-primary)' }}
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full font-extrabold py-3 rounded-lg transition transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }}
-          >
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </button>
-        </form>
-
-        {/* Link to Registration */}
-        <p className="mt-6 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Don't have an account?{' '}
-          <Link href="/register" passHref>
-            <span className="font-semibold cursor-pointer hover:underline" style={{ color: 'var(--accent)' }}>
-              Sign Up here
-            </span>
-          </Link>
-        </p>
-
-        {/* --- SOCIAL LOGIN OPTIONS --- */}
-        <div className="flex items-center my-6">
-          <div className="flex-grow border-t" style={{ borderColor: 'var(--border)' }}></div>
-          <span className="mx-4 text-xs uppercase" style={{ color: 'var(--text-muted)' }}>
-            Or continue with
-          </span>
-          <div className="flex-grow border-t" style={{ borderColor: 'var(--border)' }}></div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-black uppercase tracking-tighter text-white mb-2"
+            style={{ textShadow: '0 0 10px rgba(0,243,255,0.5)' }}>
+            System Access
+          </h1>
+          <p className="text-[var(--text-secondary)] font-mono text-sm">
+            ENTER CREDENTIALS TO CONTINUE
+          </p>
         </div>
 
-        <div className="space-y-3">
-          <button
-            onClick={() => handleOAuthLogin('github')}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center py-3 rounded-lg font-semibold border transition duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: '#24292e', color: 'white', borderColor: 'transparent' }}
-          >
-            <FontAwesomeIcon icon={faGithub} size="lg" className="mr-2" />
-            GitHub
-          </button>
-          <button
-            onClick={() => handleOAuthLogin('google')}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center py-3 rounded-lg font-semibold border transition duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: '#4285F4', color: 'white', borderColor: 'transparent' }}
-          >
-            <FontAwesomeIcon icon={faGoogle} size="lg" className="mr-2" />
-            Google
-          </button>
-        </div>
+        <CyberCard>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <CyberInput
+              label="Identity (Email)"
+              type="email"
+              placeholder="racer@grid.net"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
 
+            <CyberInput
+              label="Passcode"
+              type="password"
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
+
+            <div className="pt-4">
+              <CyberButton
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+                glow
+              >
+                {isLoading ? (
+                  <span className="animate-pulse">Authenticating...</span>
+                ) : (
+                  <>
+                    <LogIn size={18} />
+                    <span>Initialize Link</span>
+                  </>
+                )}
+              </CyberButton>
+            </div>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-[var(--border)] text-center">
+            <p className="text-[var(--text-secondary)] text-sm">
+              New to the Grid?{' '}
+              <Link href="/register" className="text-[var(--primary)] hover:text-white transition-colors font-bold uppercase tracking-wider">
+                Register ID
+              </Link>
+            </p>
+          </div>
+        </CyberCard>
       </div>
-
     </div>
   );
-};
-
-export default LoginPage;
+}

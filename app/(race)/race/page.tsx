@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RefreshCw, Save, Trophy, Clock, Target, Zap } from 'lucide-react';
+import { RefreshCw, Save, Trophy, Clock, Target, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
-import { useSession } from 'next-auth/react';
 import { saveGuestRace } from '@/lib/guestStats';
 import { useRouter } from 'next/navigation';
+import CyberButton from '@/components/ui/CyberButton';
+import CyberCard from '@/components/ui/CyberCard';
 
 const MAX_ERRORS = 10;
 
@@ -31,15 +32,7 @@ interface Racer {
     isCurrentUser: boolean;
 }
 
-interface ServerStats {
-    racesPlayed: number;
-    averageWpm: number;
-    bestWpm: number;
-    rank?: string;
-}
-
-const QuickRacePage: React.FC = () => {
-    const { data: session } = useSession();
+export default function QuickRacePage() {
     const router = useRouter();
     const [raceState, setRaceState] = useState<RaceState>({
         text: '',
@@ -57,13 +50,12 @@ const QuickRacePage: React.FC = () => {
     const [timer, setTimer] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     const [racers, setRacers] = useState<Racer[]>([
-        { id: 'user', nickname: 'You', progress: 0, wpm: 0, isCurrentUser: true },
+        { id: 'user', nickname: 'YOU', progress: 0, wpm: 0, isCurrentUser: true },
     ]);
     const [preCountdown, setPreCountdown] = useState<boolean>(false);
     const [countdown, setCountdown] = useState<number>(0);
 
     const [isSaving, setIsSaving] = useState(false);
-    const [serverStats, setServerStats] = useState<ServerStats | null>(null);
     const [guestStats, setGuestStats] = useState<any>(null);
 
     // Initialise a new race
@@ -84,9 +76,8 @@ const QuickRacePage: React.FC = () => {
         });
         setRacers(prev => prev.map(r => ({ ...r, progress: 0, wpm: 0 })));
         setPreCountdown(true);
-        setCountdown(10);
+        setCountdown(3); // Faster countdown for game feel
         setTimer(0);
-        setServerStats(null);
         setGuestStats(null);
         setIsSaving(false);
     };
@@ -136,9 +127,6 @@ const QuickRacePage: React.FC = () => {
         let newStatus: RaceState['status'] = raceState.status;
         let newStart = raceState.startTime;
 
-        // Note: The check for 'idle' was removed because of the early return above.
-        // If we ever want to support starting on typing, we need to remove the early return.
-
         let errors = 0;
         let correct = 0;
         for (let i = 0; i < newValue.length; i++) {
@@ -186,24 +174,10 @@ const QuickRacePage: React.FC = () => {
         if (raceState.status !== 'finished' || isSaving) return;
         const save = async () => {
             setIsSaving(true);
-            const payload = {
-                wpm: raceState.wpm,
-                accuracy: raceState.accuracy,
-                durationMs: (raceState.endTime ?? Date.now()) - (raceState.startTime ?? Date.now()),
-                charsTyped: raceState.charsTyped,
-                charsCorrect: raceState.charsCorrect,
-                mistakes: raceState.errors,
-                textId: raceState.textId,
-            };
             try {
-                const res = await fetch('/api/race/finish', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const data = await res.json();
-                if (session?.user && data.user) setServerStats(data.user);
-                else setGuestStats(saveGuestRace(raceState.wpm));
+                // Frontend-only: Save to local storage
+                const stats = saveGuestRace(raceState.wpm);
+                setGuestStats(stats);
             } catch (e) {
                 console.error('Failed to save race', e);
             } finally {
@@ -211,18 +185,18 @@ const QuickRacePage: React.FC = () => {
             }
         };
         save();
-    }, [raceState.status, raceState.wpm, raceState.accuracy, raceState.endTime, raceState.startTime, raceState.charsTyped, raceState.charsCorrect, raceState.errors, raceState.textId, session]);
+    }, [raceState.status, raceState.wpm, isSaving]);
 
     // Render text with styling
     const renderText = useMemo(() => {
         const textChars = raceState.text.split('');
         const inputChars = raceState.userInput.split('');
         return textChars.map((char, i) => {
-            let className = '';
+            let className = 'transition-colors duration-75 ';
             if (i < inputChars.length) {
-                className = inputChars[i] === char ? 'correct-char' : 'wrong-char';
+                className += inputChars[i] === char ? 'correct-char' : 'wrong-char';
             } else {
-                className = 'untyped-char';
+                className += 'untyped-char';
             }
             if (i === inputChars.length && raceState.status === 'running') {
                 className += ' current-char-position';
@@ -241,123 +215,172 @@ const QuickRacePage: React.FC = () => {
     }, []);
 
     return (
-        <div className="container mx-auto p-4 md:p-8 min-h-[80vh] flex flex-col items-center relative">
-            <h1 className="text-3xl font-extrabold mb-8" style={{ color: 'var(--text-primary)' }}>
-                Quick Race
-            </h1>
+        <div className="min-h-screen flex flex-col items-center p-4 md:p-8 relative z-10">
 
-            {/* Countdown overlay */}
+            {/* HUD Header */}
+            <div className="w-full max-w-5xl mb-8 flex justify-between items-end border-b border-[var(--border)] pb-4">
+                <div>
+                    <h1 className="text-2xl font-black uppercase tracking-widest text-white flex items-center gap-2">
+                        <Zap className="text-[var(--primary)]" />
+                        Speed Protocol
+                    </h1>
+                    <p className="text-[var(--text-secondary)] text-xs font-mono">
+                        STATUS: {raceState.status === 'running' ? 'ACTIVE' : raceState.status.toUpperCase()}
+                    </p>
+                </div>
+
+                {raceState.status !== 'finished' && (
+                    <div className="flex gap-8 font-mono text-xl">
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">TIMER</span>
+                            <span className="text-white">{timer}s</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">WPM</span>
+                            <span className="text-[var(--primary)] drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]">{raceState.wpm}</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">ACCURACY</span>
+                            <span className={raceState.accuracy < 90 ? 'text-[var(--error)]' : 'text-[var(--success)]'}>
+                                {raceState.accuracy.toFixed(0)}%
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Countdown Overlay */}
             {preCountdown && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-                    <div className="text-6xl font-bold" style={{ color: 'var(--accent)' }}>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50">
+                    <div className="text-9xl font-black text-[var(--primary)] animate-pulse" style={{ textShadow: '0 0 50px var(--primary)' }}>
                         {countdown}
                     </div>
                 </div>
             )}
 
-            {/* Racers track */}
-            <div className="w-full max-w-4xl mb-6">
-                <h2 className="text-xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-                    Racers
-                </h2>
-                <div className="space-y-3">
+            {/* Main Race Area */}
+            <div className="w-full max-w-4xl relative">
+
+                {/* Racers Track (HUD Style) */}
+                <div className="mb-8 space-y-2">
                     {racers.map(r => (
-                        <div
-                            key={r.id}
-                            className={`p-3 rounded-lg border ${r.isCurrentUser ? 'border-2' : 'border'}`}
-                            style={{
-                                backgroundColor: 'var(--bg-card)',
-                                borderColor: r.isCurrentUser ? 'var(--accent)' : 'var(--border)',
-                            }}
-                        >
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="font-bold" style={{ color: r.isCurrentUser ? 'var(--accent)' : 'var(--text-primary)' }}>
-                                    {r.nickname} {r.isCurrentUser && '(You)'}
+                        <div key={r.id} className="relative h-12 bg-[var(--bg-card)] border border-[var(--border)] rounded overflow-hidden">
+                            {/* Progress Bar */}
+                            <div
+                                className="absolute top-0 left-0 h-full bg-[var(--primary)] opacity-20 transition-all duration-300 ease-linear"
+                                style={{ width: `${r.progress}%` }}
+                            />
+                            {/* Racer Info */}
+                            <div className="absolute inset-0 flex items-center justify-between px-4">
+                                <span className="font-bold text-white tracking-wider flex items-center gap-2">
+                                    {r.nickname}
+                                    {r.isCurrentUser && <span className="text-[var(--primary)] text-xs bg-[var(--primary)]/10 px-1 rounded">YOU</span>}
                                 </span>
-                                <span className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>
-                                    {r.wpm} WPM | {r.progress.toFixed(1)}%
-                                </span>
+                                <span className="font-mono text-[var(--primary)]">{r.wpm} WPM</span>
                             </div>
-                            <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
-                                <div
-                                    className="h-full transition-all duration-300"
-                                    style={{ width: `${r.progress}%`, backgroundColor: r.isCurrentUser ? 'var(--accent)' : 'var(--text-muted)' }}
-                                />
-                            </div>
+                            {/* Leading Edge Indicator */}
+                            <div
+                                className="absolute top-0 bottom-0 w-1 bg-[var(--primary)] shadow-[0_0_10px_var(--primary)] transition-all duration-300 ease-linear"
+                                style={{ left: `${r.progress}%` }}
+                            />
                         </div>
                     ))}
                 </div>
-            </div>
 
-            {/* Live stats */}
-            {raceState.status !== 'finished' && (
-                <div className="flex justify-between w-full max-w-4xl mb-4 text-xl font-mono" style={{ color: 'var(--text-secondary)' }}>
-                    <span>Temps: {timer}s</span>
-                    <span>WPM: {raceState.wpm}</span>
-                    <span>Erreurs: {raceState.errors}/{MAX_ERRORS}</span>
-                    <span>Précision: {raceState.accuracy.toFixed(1)}%</span>
+                {/* Text Display (Cockpit) */}
+                <div
+                    className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]"
+                    onClick={() => inputRef.current?.focus()}
+                >
+                    {/* Corner Accents */}
+                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--primary)]" />
+                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--primary)]" />
+                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--primary)]" />
+                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--primary)]" />
+
+                    {renderText}
+
+                    {/* Hidden Input */}
+                    {raceState.status !== 'finished' && (
+                        <input
+                            ref={inputRef}
+                            className="absolute inset-0 opacity-0 cursor-default"
+                            value={raceState.userInput}
+                            onChange={handleUserInput}
+                            disabled={raceState.status !== 'running'}
+                            autoFocus
+                        />
+                    )}
+
+                    {/* Start Prompt */}
+                    {raceState.status === 'idle' && !preCountdown && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                            <CyberButton onClick={startNewRace} glow>
+                                <Play size={20} /> INITIALIZE RACE
+                            </CyberButton>
+                        </div>
+                    )}
                 </div>
-            )}
 
-            {/* Text display */}
-            <div className="w-full max-w-4xl mb-4 p-4 bg-[var(--bg-surface)] rounded-lg border border-[var(--border)]" style={{ minHeight: '8rem' }}>
-                {renderText}
+                {/* Error Warning */}
+                {raceState.errors > 0 && raceState.status === 'running' && (
+                    <div className="mt-4 flex items-center justify-center text-[var(--error)] animate-pulse font-mono font-bold">
+                        <AlertTriangle size={20} className="mr-2" />
+                        WARNING: INTEGRITY COMPROMISED ({raceState.errors}/{MAX_ERRORS})
+                    </div>
+                )}
             </div>
 
-            {/* Input */}
-            {raceState.status !== 'finished' && (
-                <input
-                    ref={inputRef}
-                    className="w-full max-w-4xl p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                    placeholder="Start typing..."
-                    value={raceState.userInput}
-                    onChange={handleUserInput}
-                    disabled={raceState.status !== 'running'}
-                />
-            )}
-
-            {/* Results */}
+            {/* Results Modal */}
             {raceState.status === 'finished' && (
-                <div className="mt-6 p-6 bg-[var(--bg-card)] rounded-lg shadow-md text-center">
-                    <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-                        Résultat de la course
-                    </h2>
-                    <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
-                        WPM: {raceState.wpm} | Précision: {raceState.accuracy.toFixed(1)}% | Temps: {timer}s
-                    </p>
-                    {serverStats && (
-                        <div className="mt-4 text-left">
-                            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Statistiques du serveur</h3>
-                            <p>Races jouées: {serverStats.racesPlayed}</p>
-                            <p>WPM moyen: {serverStats.averageWpm}</p>
-                            <p>Meilleur WPM: {serverStats.bestWpm}</p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+                    <CyberCard className="max-w-2xl w-full animate-in fade-in zoom-in duration-300 border-[var(--primary)] shadow-[0_0_50px_rgba(0,243,255,0.2)]">
+                        <div className="text-center mb-8">
+                            <h2 className="text-4xl font-black uppercase text-white mb-2" style={{ textShadow: '0 0 20px var(--primary)' }}>
+                                Sequence Complete
+                            </h2>
+                            <p className="text-[var(--text-secondary)] font-mono">DATA UPLOADED TO LOCAL STORAGE</p>
                         </div>
-                    )}
-                    {guestStats && (
-                        <div className="mt-4 text-left">
-                            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Statistiques invité</h3>
-                            <p>Races jouées: {guestStats.racesPlayed}</p>
-                            <p>Meilleur WPM: {guestStats.bestWpm}</p>
+
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Speed</div>
+                                <div className="text-4xl font-black text-[var(--primary)]">{raceState.wpm}</div>
+                                <div className="text-xs text-[var(--text-muted)]">WPM</div>
+                            </div>
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Precision</div>
+                                <div className="text-4xl font-black text-[var(--success)]">{raceState.accuracy.toFixed(0)}%</div>
+                                <div className="text-xs text-[var(--text-muted)]">ACCURACY</div>
+                            </div>
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Time</div>
+                                <div className="text-4xl font-black text-white">{timer}s</div>
+                                <div className="text-xs text-[var(--text-muted)]">DURATION</div>
+                            </div>
                         </div>
-                    )}
-                    <div className="flex justify-center gap-4 mt-4">
-                        <button
-                            className="bg-[var(--accent)] text-[var(--bg-base)] py-2 px-4 rounded hover:opacity-90 transition-opacity"
-                            onClick={startNewRace}
-                        >
-                            Rejouer
-                        </button>
-                        <button
-                            className="bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] py-2 px-4 rounded hover:bg-[var(--bg-hover)] transition-colors"
-                            onClick={() => router.push('/dashboard')}
-                        >
-                            Quitter
-                        </button>
-                    </div>
+
+                        {guestStats && (
+                            <div className="mb-8 p-4 bg-[var(--bg-surface)] rounded border border-[var(--border)]">
+                                <h3 className="text-sm font-bold uppercase text-[var(--text-secondary)] mb-2">Personal Best</h3>
+                                <div className="flex justify-between items-center font-mono">
+                                    <span>Highest WPM: <span className="text-white">{guestStats.bestWpm}</span></span>
+                                    <span>Total Races: <span className="text-white">{guestStats.racesPlayed}</span></span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-center gap-4">
+                            <CyberButton onClick={startNewRace} glow>
+                                <RefreshCw size={18} /> RESTART SEQUENCE
+                            </CyberButton>
+                            <CyberButton variant="secondary" onClick={() => router.push('/dashboard')}>
+                                EXIT TO HUB
+                            </CyberButton>
+                        </div>
+                    </CyberCard>
                 </div>
             )}
         </div>
     );
-};
-
-export default QuickRacePage;
+}

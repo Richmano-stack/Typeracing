@@ -4,48 +4,36 @@
    FONT SETUP
 ------------------------------ */
 :root {
-  --font-primary: var(--font-inter), "Inter", Arial, sans-serif;
+  --font-primary: var(--font-inter), "Inter", "Segoe UI", Roboto, monospace;
 }
 
 /* ------------------------------
-   DARK THEME (DEFAULT)
+   NEON CYBERPUNK THEME
 ------------------------------ */
 :root {
   /* Backgrounds */
-  --bg-base: #181a1b;
-  --bg-surface: #222425;
-  --bg-card: #1f2021;
+  --bg-base: #050505;       /* Deep Void */
+  --bg-surface: #0a0a12;    /* Midnight Blue */
+  --bg-card: rgba(10, 10, 18, 0.6); /* Glassy Dark */
 
   /* Text */
-  --text-primary: #f2f2f2;
-  --text-secondary: #c5c5c5;
-  --text-muted: #8c8c8c;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
 
-  /* Accent (neon green/teal mix) */
-  --accent: #00ffa6;
+  /* Accents */
+  --primary: #00f3ff;       /* Neon Cyan */
+  --secondary: #ff0099;     /* Hot Pink */
+  --accent: #bc13fe;        /* Electric Purple */
+  
+  /* Status */
+  --success: #00ff9d;
+  --error: #ff0055;
 
   /* Borders/Shadows */
-  --border: #2d2f30;
-  --shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-}
-
-/* ------------------------------
-   LIGHT THEME
------------------------------- */
-html[data-theme="light"] {
-  --bg-base: #f7f7f7;
-  --bg-surface: #f0f0f0;
-  --bg-card: #ffffff;
-
-  --text-primary: #1f1f1f;
-  --text-secondary: #4a4a4a;
-  --text-muted: #797979;
-
-  /* Slightly softer accent for light mode */
-  --accent: #1bbf77;
-
-  --border: #dddddd;
-  --shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  --border: rgba(0, 243, 255, 0.2);
+  --shadow-neon: 0 0 10px rgba(0, 243, 255, 0.3), 0 0 20px rgba(0, 243, 255, 0.1);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ------------------------------
@@ -56,60 +44,110 @@ html {
 }
 
 body {
-  background: var(--bg-base);
+  background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-primary);
-  transition:
-    background-color 0.25s ease,
-    color 0.25s ease;
+  overflow-x: hidden;
+  min-height: 100vh;
+  
+  /* Performance-optimized Background */
+  background-image: 
+    radial-gradient(circle at 50% 0%, #1a1a2e 0%, transparent 70%),
+    radial-gradient(circle at 80% 100%, #120a2e 0%, transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Noise Texture Overlay (Pseudo-element for performance) */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 /* Highlight selections */
 ::selection {
-  background: var(--accent);
+  background: var(--primary);
   color: #000;
 }
 
 /* ------------------------------
-   GLOBAL UTILITY CLASSES
-   (Automatically usable with Tailwind)
+   UTILITY CLASSES
 ------------------------------ */
 
-/* Accent text */
-.text-accent {
-  color: var(--accent);
+/* Neon Text */
+.text-neon {
+  color: var(--primary);
+  text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
 }
 
-/* Accent background (buttons, progress bars) */
-.bg-accent {
-  background: var(--accent);
+.text-neon-pink {
+  color: var(--secondary);
+  text-shadow: 0 0 5px rgba(255, 0, 153, 0.5);
 }
 
-/* Card / panels */
-.ui-card {
+/* Cyber Card */
+.cyber-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow);
-  padding: 1rem;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
 }
 
-/* Typing highlight */
-.current-word {
-  color: var(--accent);
+/* Corner Accents for Cards */
+.cyber-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: 
+    linear-gradient(to right, var(--primary) 2px, transparent 2px) 0 0,
+    linear-gradient(to bottom, var(--primary) 2px, transparent 2px) 0 0,
+    linear-gradient(to left, var(--primary) 2px, transparent 2px) 100% 0,
+    linear-gradient(to bottom, var(--primary) 2px, transparent 2px) 100% 0,
+    linear-gradient(to right, var(--primary) 2px, transparent 2px) 0 100%,
+    linear-gradient(to top, var(--primary) 2px, transparent 2px) 0 100%,
+    linear-gradient(to left, var(--primary) 2px, transparent 2px) 100% 100%,
+    linear-gradient(to top, var(--primary) 2px, transparent 2px) 100% 100%;
+  background-size: 10px 10px;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+}
+
+/* Typing Game Styles */
+.current-char-position {
+  border-left: 2px solid var(--primary);
+  animation: blink 1s infinite;
 }
 
 .correct-char {
-  color: var(--accent);
+  color: var(--text-primary);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
 .wrong-char {
-  color: #ff4d4d;
+  color: var(--secondary);
+  text-shadow: 0 0 2px rgba(255, 0, 153, 0.5);
+  text-decoration: underline;
 }
 
-/* Progress bar */
-.progress-bar {
-  background: var(--accent);
-  height: 4px;
-  border-radius: 999px;
+.untyped-char {
+  color: var(--text-muted);
 }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
