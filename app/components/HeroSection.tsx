@@ -36,7 +36,7 @@ const HeroSection: React.FC = () => {
 
       {/* Hero Content */}
       <div className="max-w-5xl mb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[var(--primary)] bg-[rgba(0,243,255,0.1)] text-[var(--primary)] font-mono text-xs mb-6 animate-pulse">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[var(--primary)] bg-[var(--bg-primary-hover)] text-[var(--primary)] font-mono text-xs mb-6 animate-pulse">
           <Terminal size={12} />
           <span>SYSTEM ONLINE // READY FOR INPUT</span>
         </div>

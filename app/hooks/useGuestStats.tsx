@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 interface GuestStats {
     racesPlayed: number;
@@ -29,7 +29,7 @@ const GuestStatsContext = createContext<GuestStatsContextType | undefined>(undef
 export const GuestStatsProvider = ({ children }: { children: ReactNode }) => {
     const [stats, setStats] = useState<GuestStats>(defaultStats);
 
-    const saveRace = (wpm: number, accuracy: number) => {
+    const saveRace = useCallback((wpm: number, accuracy: number) => {
         setStats((prev) => {
             const newRacesPlayed = prev.racesPlayed + 1;
             const newAccuracy = ((prev.accuracy * prev.racesPlayed) + accuracy) / newRacesPlayed;
@@ -42,17 +42,16 @@ export const GuestStatsProvider = ({ children }: { children: ReactNode }) => {
                 streak: prev.streak + 1,
             };
         });
-    };
+    }, []);
 
-    const resetStats = () => {
+    const resetStats = useCallback(() => {
         setStats(defaultStats);
-    };
+    }, []);
 
     return (
-        <GuestStatsContext.Provider value= {{ stats, saveRace, resetStats }
-}>
-    { children }
-    </GuestStatsContext.Provider>
+        <GuestStatsContext.Provider value={{ stats, saveRace, resetStats }}>
+            {children}
+        </GuestStatsContext.Provider>
     );
 };
 

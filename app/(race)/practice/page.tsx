@@ -1,73 +1,68 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { RefreshCw, Trophy } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
+import { useRaceStore } from '@/lib/useRaceStore';
+import { useTimerStore } from '@/lib/useTimerStore';
 
 const MAX_ERRORS = 10;
-interface PracticeState {
-    text: string;
-    userInput: string;
-    status: 'idle' | 'running' | 'finished';
-    startTime: number | null;
-    endTime: number | null;
-    wpm: number;
-    accuracy: number;
-    errors: number;
-}
 
 const PracticePage: React.FC = () => {
-    const [practiceState, setPracticeState] = useState<PracticeState>({
-        text: "",
-        userInput: "",
-        status: 'idle',
-        startTime: null,
-        endTime: null,
-        wpm: 0,
-        accuracy: 100,
-        errors: 0,
-    });
-    const [timer, setTimer] = useState(0);
-    const [bestWpm, setBestWpm] = useState<number | null>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
+    const [bestWpm, setBestWpm] = React.useState<number | null>(null);
 
+    // Race store
+    const {
+        text,
+        userInput,
+        status,
+        wpm,
+        accuracy,
+        errors,
+        initializeRace,
+        setUserInput,
+        startRace,
+        resetRace,
+    } = useRaceStore();
+
+    // Timer store
+    const {
+        elapsed: timer,
+        startTimer,
+        resetTimer,
+        tick,
+    } = useTimerStore();
+
+    // Load best WPM from localStorage on mount
     useEffect(() => {
-        setPracticeState(prev => ({
-            ...prev,
-            text: TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)]
-        }));
+        const randomText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
+        initializeRace(randomText, '0', 'practice');
+
         const saved = localStorage.getItem('bestWpm');
         if (saved) setBestWpm(parseInt(saved));
-    }, []);
+    }, [initializeRace]);
 
+    // Save best WPM when race finishes
     useEffect(() => {
-        if (practiceState.status === 'finished' && practiceState.wpm > 0) {
-            if (bestWpm === null || practiceState.wpm > bestWpm) {
-                setBestWpm(practiceState.wpm);
-                localStorage.setItem('bestWpm', practiceState.wpm.toString());
+        if (status === 'finished' && wpm > 0) {
+            if (bestWpm === null || wpm > bestWpm) {
+                setBestWpm(wpm);
+                localStorage.setItem('bestWpm', wpm.toString());
             }
         }
-    }, [practiceState.status, practiceState.wpm, bestWpm]);
+    }, [status, wpm, bestWpm]);
 
     const handleReset = () => {
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
-        setPracticeState({
-            text: newText,
-            userInput: "",
-            status: 'idle',
-            startTime: null,
-            endTime: null,
-            wpm: 0,
-            accuracy: 100,
-            errors: 0,
-        });
-        setTimer(0);
+        initializeRace(newText, '0', 'practice');
+        resetTimer();
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
     const renderText = useMemo(() => {
-        const textChars = practiceState.text.split('');
-        const inputChars = practiceState.userInput.split('');
+        const textChars = text.split('');
+        const inputChars = userInput.split('');
         return textChars.map((char, index) => {
             const inputChar = inputChars[index];
             let className = '';
@@ -76,79 +71,37 @@ const PracticePage: React.FC = () => {
             } else {
                 className = 'untyped-char';
             }
-            if (index === inputChars.length && practiceState.status === 'running') {
+            if (index === inputChars.length && status === 'running') {
                 className += ' current-char-position';
             }
             return <span key={index} className={className}>{char}</span>;
         });
-    }, [practiceState.text, practiceState.userInput, practiceState.status]);
+    }, [text, userInput, status]);
 
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
-        const text = practiceState.text;
-        if (practiceState.status === "finished") return;
-        if (practiceState.errors >= MAX_ERRORS && newValue.length > practiceState.userInput.length) return;
 
-        let newStatus: PracticeState["status"] = practiceState.status;
-        let newStartTime: number | null = practiceState.startTime;
-        let errors = 0;
+        if (status === "finished") return;
+        if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
-        if (newStatus === "idle" && newValue.length > 0) {
-            newStatus = "running";
-            newStartTime = Date.now();
+        // Start race on first input
+        if (status === "idle" && newValue.length > 0) {
+            startRace();
+            startTimer();
         }
 
-        for (let i = 0; i < newValue.length; i++) {
-            if (i < text.length && newValue[i] !== text[i]) errors++;
-        }
-
-        let newEndTime: number | null = practiceState.endTime;
-        if (newValue.length >= text.length) {
-            newStatus = "finished";
-            newEndTime = practiceState.endTime || Date.now();
-        }
-
-        setPracticeState(prevState => {
-            let wpm = 0;
-            let accuracy = 100;
-            const currentInputLength = newValue.length;
-
-            if (newStatus === "running" || newStatus === "finished") {
-                const startTime = newStartTime || prevState.startTime;
-                if (startTime) {
-                    const timeElapsedMs = (newEndTime || Date.now()) - startTime;
-                    const timeElapsedMin = timeElapsedMs / 60000;
-                    if (timeElapsedMin > 0 && currentInputLength > 0) {
-                        const netChars = currentInputLength - errors;
-                        wpm = Math.max(0, Math.floor((netChars / 5) / timeElapsedMin));
-                        accuracy = Math.max(0, 100 - (errors / currentInputLength) * 100);
-                    }
-                }
-            }
-
-            return {
-                ...prevState,
-                userInput: newValue.slice(0, text.length),
-                status: newStatus,
-                startTime: newStartTime,
-                endTime: newEndTime,
-                errors,
-                wpm,
-                accuracy,
-            };
-        });
+        setUserInput(newValue);
     };
 
+    // Timer tick
     useEffect(() => {
-        let interval: NodeJS.Timeout | null = null;
-        if (practiceState.status === 'running') {
-            interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-        }
-        return () => interval && clearInterval(interval);
-    }, [practiceState.status]);
+        if (status !== 'running') return;
+        const interval = setInterval(() => tick(), 1000);
+        return () => clearInterval(interval);
+    }, [status, tick]);
 
-    const progressPercentage = practiceState.text.length > 0
-        ? (practiceState.userInput.length / practiceState.text.length) * 100
+    const progressPercentage = text.length > 0
+        ? (userInput.length / text.length) * 100
         : 0;
 
     return (
@@ -172,7 +125,7 @@ const PracticePage: React.FC = () => {
                 <div className="flex justify-between items-center mb-2">
                     <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Your Progress</span>
                     <span className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>
-                        {practiceState.wpm} WPM | {progressPercentage.toFixed(1)}%
+                        {wpm} WPM | {progressPercentage.toFixed(1)}%
                     </span>
                 </div>
                 <div className="w-full bg-secondary rounded-full h-4 overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
@@ -180,12 +133,12 @@ const PracticePage: React.FC = () => {
                 </div>
             </div>
 
-            {practiceState.status !== 'finished' && (
+            {status !== 'finished' && (
                 <div className="flex justify-between w-full max-w-4xl mb-4 text-xl font-mono" style={{ color: 'var(--text-secondary)' }}>
                     <span>Temps: {timer}s</span>
-                    <span>WPM: {practiceState.wpm}</span>
-                    <span>Erreurs: {practiceState.errors}/{MAX_ERRORS}</span>
-                    <span>Précision: {practiceState.accuracy.toFixed(1)}%</span>
+                    <span>WPM: {wpm}</span>
+                    <span>Erreurs: {errors}/{MAX_ERRORS}</span>
+                    <span>Précision: {accuracy.toFixed(1)}%</span>
                 </div>
             )}
 
@@ -193,16 +146,16 @@ const PracticePage: React.FC = () => {
                 <p>{renderText}</p>
             </div>
 
-            {practiceState.status === 'finished' && (
+            {status === 'finished' && (
                 <div className="w-full max-w-4xl mb-6 p-6 rounded-xl border-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--accent)' }}>
                     <h2 className="text-4xl font-extrabold mb-4 text-center" style={{ color: 'var(--accent)' }}>
-                        {bestWpm !== null && practiceState.wpm > bestWpm ? '🎉 New Record!' : 'Practice Complete!'}
+                        {bestWpm !== null && wpm > bestWpm ? '🎉 New Record!' : 'Practice Complete!'}
                     </h2>
-                    <p className="text-2xl font-bold text-center" style={{ color: 'var(--text-primary)' }}>WPM: {practiceState.wpm}</p>
+                    <p className="text-2xl font-bold text-center" style={{ color: 'var(--text-primary)' }}>WPM: {wpm}</p>
                     <p className="text-lg text-center" style={{ color: 'var(--text-secondary)' }}>
-                        Précision: {practiceState.accuracy.toFixed(1)}% | Erreurs: {practiceState.errors}
+                        Précision: {accuracy.toFixed(1)}% | Erreurs: {errors}
                     </p>
-                    {bestWpm !== null && practiceState.wpm <= bestWpm && (
+                    {bestWpm !== null && wpm <= bestWpm && (
                         <p className="text-sm mt-2 text-center" style={{ color: 'var(--text-muted)' }}>Best: {bestWpm} WPM</p>
                     )}
                     <div className="flex justify-center">
@@ -220,24 +173,24 @@ const PracticePage: React.FC = () => {
                 style={{
                     backgroundColor: 'var(--bg-surface)',
                     color: "var(--text-primary)",
-                    borderColor: practiceState.errors > 0 ? '#ff4d4d' : 'var(--accent)',
+                    borderColor: errors > 0 ? '#ff4d4d' : 'var(--accent)',
                     caretColor: 'var(--accent)',
-                    opacity: practiceState.status === 'finished' ? 0 : 1,
+                    opacity: status === 'finished' ? 0 : 1,
                 }}
-                value={practiceState.userInput}
+                value={userInput}
                 onChange={handleUserInput}
-                disabled={practiceState.status === 'finished'}
+                disabled={status === 'finished'}
                 autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
             />
 
-            {practiceState.errors >= MAX_ERRORS && (
+            {errors >= MAX_ERRORS && (
                 <div className="mt-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 font-bold animate-pulse">
                     ⚠️ You are typing it wrong! Please correct your errors.
                 </div>
             )}
 
-            {practiceState.status !== 'finished' && (
+            {status !== 'finished' && (
                 <button onClick={handleReset} className="mt-12 py-2 px-4 rounded-md flex items-center transition hover:opacity-80" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }}>
                     <RefreshCw size={18} className="mr-2" /> Redémarrer
                 </button>

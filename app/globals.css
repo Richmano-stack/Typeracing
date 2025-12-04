@@ -12,9 +12,12 @@
 ------------------------------ */
 :root {
   /* Backgrounds */
-  --bg-base: #050505;       /* Deep Void */
-  --bg-surface: #0a0a12;    /* Midnight Blue */
-  --bg-card: rgba(10, 10, 18, 0.6); /* Glassy Dark */
+  --bg-base: #050505;
+  /* Deep Void */
+  --bg-surface: #0a0a12;
+  /* Midnight Blue */
+  --bg-card: rgba(10, 10, 18, 0.6);
+  /* Glassy Dark */
 
   /* Text */
   --text-primary: #ffffff;
@@ -22,10 +25,13 @@
   --text-muted: #475569;
 
   /* Accents */
-  --primary: #00f3ff;       /* Neon Cyan */
-  --secondary: #ff0099;     /* Hot Pink */
-  --accent: #bc13fe;        /* Electric Purple */
-  
+  --primary: #00f3ff;
+  /* Neon Cyan */
+  --secondary: #ff0099;
+  /* Hot Pink */
+  --accent: #bc13fe;
+  /* Electric Purple */
+
   /* Status */
   --success: #00ff9d;
   --error: #ff0055;
@@ -34,6 +40,18 @@
   --border: rgba(0, 243, 255, 0.2);
   --shadow-neon: 0 0 10px rgba(0, 243, 255, 0.3), 0 0 20px rgba(0, 243, 255, 0.1);
   --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* UNIFIED BACKGROUND COLORS - Change these to update all hover/background effects */
+  --bg-primary-subtle: rgba(0, 243, 255, 0.05);
+  /* Very light primary background */
+  --bg-primary-hover: rgba(0, 243, 255, 0.1);
+  /* Primary hover state */
+  --bg-secondary-hover: rgba(188, 19, 254, 0.1);
+  /* Accent/secondary hover */
+  --bg-danger-hover: rgba(255, 0, 85, 0.1);
+  /* Error/danger hover */
+  --bg-overlay: rgba(0, 0, 0, 0.3);
+  /* Dark overlay */
 }
 
 /* ------------------------------
@@ -49,16 +67,17 @@ body {
   font-family: var(--font-primary);
   overflow-x: hidden;
   min-height: 100vh;
-  
-  /* Performance-optimized Background */
-  background-image: 
-    radial-gradient(circle at 50% 0%, #1a1a2e 0%, transparent 70%),
-    radial-gradient(circle at 80% 100%, #120a2e 0%, transparent 70%);
+
+  /* Smooth Gradient Background - Less Pixelated */
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(0, 243, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 90%, rgba(188, 19, 254, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 18, 0.9) 0%, var(--bg-base) 100%);
   background-attachment: fixed;
 }
 
-/* Noise Texture Overlay (Pseudo-element for performance) */
-body::before {
+/* Optional: Subtle grain texture (much less pixelated than before) */
+body::after {
   content: "";
   position: fixed;
   top: 0;
@@ -66,9 +85,39 @@ body::before {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 9999;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  z-index: 1;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* Animated gradient overlay (optional - comment out if you prefer static) */
+/* body::before {
+  content: "";
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.1;
+  background: 
+    radial-gradient(circle at 30% 20%, var(--primary) 0%, transparent 25%),
+    radial-gradient(circle at 70% 80%, var(--accent) 0%, transparent 25%);
+  animation: gradientShift 20s ease-in-out infinite;
+} */
+
+@keyframes gradientShift {
+
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  50% {
+    transform: translate(-10%, -10%) rotate(5deg);
+  }
 }
 
 /* Highlight selections */
@@ -111,7 +160,7 @@ body::before {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  background: 
+  background:
     linear-gradient(to right, var(--primary) 2px, transparent 2px) 0 0,
     linear-gradient(to bottom, var(--primary) 2px, transparent 2px) 0 0,
     linear-gradient(to left, var(--primary) 2px, transparent 2px) 100% 0,
@@ -147,7 +196,13 @@ body::before {
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
 
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}

@@ -19,9 +19,9 @@ const CyberButton: React.FC<CyberButtonProps> = ({
     const baseStyles = "relative font-bold uppercase tracking-wider transition-all duration-200 group clip-path-polygon-[0_0,100%_0,100%_70%,85%_100%,0_100%]";
 
     const variants = {
-        primary: "text-white bg-transparent border border-[var(--primary)] hover:bg-[rgba(0,243,255,0.1)]",
-        secondary: "text-white bg-transparent border border-[var(--accent)] hover:bg-[rgba(188,19,254,0.1)]",
-        danger: "text-white bg-transparent border border-[var(--error)] hover:bg-[rgba(255,0,85,0.1)]",
+        primary: "text-white bg-transparent border border-[var(--primary)] hover:bg-[var(--bg-primary-hover)]",
+        secondary: "text-white bg-transparent border border-[var(--accent)] hover:bg-[var(--bg-secondary-hover)]",
+        danger: "text-white bg-transparent border border-[var(--error)] hover:bg-[var(--bg-danger-hover)]",
     };
 
     const sizes = {

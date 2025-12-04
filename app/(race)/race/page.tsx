@@ -1,83 +1,67 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RefreshCw, Save, Trophy, Clock, Target, Zap, Play, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { RefreshCw, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useGuestStats } from '@/hooks/useGuestStats';
 import { useRouter } from 'next/navigation';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberCard from '@/components/ui/CyberCard';
+import { useRaceStore } from '@/lib/useRaceStore';
+import { useTimerStore } from '@/lib/useTimerStore';
+import { useMultiplayerStore } from '@/lib/useMultiplayerStore';
 
 const MAX_ERRORS = 10;
-
-interface RaceState {
-    text: string;
-    textId: string;
-    userInput: string;
-    status: 'idle' | 'countdown' | 'running' | 'finished';
-    startTime: number | null;
-    endTime: number | null;
-    wpm: number;
-    accuracy: number;
-    errors: number;
-    charsTyped: number;
-    charsCorrect: number;
-}
-
-interface Racer {
-    id: string;
-    nickname: string;
-    progress: number;
-    wpm: number;
-    isCurrentUser: boolean;
-}
 
 export default function QuickRacePage() {
     const router = useRouter();
     const { stats, saveRace } = useGuestStats();
-    const [raceState, setRaceState] = useState<RaceState>({
-        text: '',
-        textId: '',
-        userInput: '',
-        status: 'idle',
-        startTime: null,
-        endTime: null,
-        wpm: 0,
-        accuracy: 100,
-        errors: 0,
-        charsTyped: 0,
-        charsCorrect: 0,
-    });
-    const [timer, setTimer] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [racers, setRacers] = useState<Racer[]>([
-        { id: 'user', nickname: 'YOU', progress: 0, wpm: 0, isCurrentUser: true },
-    ]);
-    const [preCountdown, setPreCountdown] = useState<boolean>(false);
-    const [countdown, setCountdown] = useState<number>(0);
+    const [isSaving, setIsSaving] = React.useState(false);
 
-    const [isSaving, setIsSaving] = useState(false);
+    // Race store
+    const {
+        text,
+        userInput,
+        status,
+        wpm,
+        accuracy,
+        errors,
+        initializeRace,
+        setUserInput,
+        startRace,
+        resetRace,
+    } = useRaceStore();
 
-    // Initialise a new race
+    // Timer store
+    const {
+        elapsed: timer,
+        countdown,
+        startTimer,
+        resetTimer,
+        tick,
+        startCountdown,
+        tickCountdown,
+    } = useTimerStore();
+
+    // Multiplayer store
+    const {
+        racers,
+        initializeRacers,
+        updateCurrentUserProgress,
+        resetRacers,
+    } = useMultiplayerStore();
+
+    const [preCountdown, setPreCountdown] = React.useState<boolean>(false);
+
+    // Initialize a new race
     const startNewRace = () => {
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
-        setRaceState({
-            text: TYPING_TEXTS[randomIndex],
-            textId: randomIndex.toString(),
-            userInput: '',
-            status: 'countdown',
-            startTime: null,
-            endTime: null,
-            wpm: 0,
-            accuracy: 100,
-            errors: 0,
-            charsTyped: 0,
-            charsCorrect: 0,
-        });
-        setRacers(prev => prev.map(r => ({ ...r, progress: 0, wpm: 0 })));
+        initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
+        resetRacers();
         setPreCountdown(true);
-        setCountdown(3); // Faster countdown for game feel
-        setTimer(0);
+        startCountdown(3);
+        resetTimer();
         setIsSaving(false);
     };
 
@@ -86,96 +70,53 @@ export default function QuickRacePage() {
         if (!preCountdown) return;
         if (countdown <= 0) {
             setPreCountdown(false);
-            setRaceState(prev => ({ ...prev, status: 'running', startTime: Date.now() }));
+            startRace();
+            startTimer();
             return;
         }
-        const id = setInterval(() => setCountdown(c => c - 1), 1000);
+        const id = setInterval(() => tickCountdown(), 1000);
         return () => clearInterval(id);
-    }, [preCountdown, countdown]);
+    }, [preCountdown, countdown, startRace, startTimer, tickCountdown]);
 
     // Auto-focus input when race starts
     useEffect(() => {
-        if (raceState.status === 'running') {
+        if (status === 'running') {
             inputRef.current?.focus();
         }
-    }, [raceState.status]);
+    }, [status]);
 
     // Timer while running
     useEffect(() => {
-        if (raceState.status !== 'running') return;
-        const id = setInterval(() => setTimer(t => t + 1), 1000);
+        if (status !== 'running') return;
+        const id = setInterval(() => tick(), 1000);
         return () => clearInterval(id);
-    }, [raceState.status]);
+    }, [status, tick]);
 
     // Update racer progress when user types
     useEffect(() => {
-        if (raceState.text.length === 0) return;
-        const progress = Math.min(100, (raceState.userInput.length / raceState.text.length) * 100);
-        setRacers(prev =>
-            prev.map(r => (r.isCurrentUser ? { ...r, progress, wpm: raceState.wpm } : r))
-        );
-    }, [raceState.userInput, raceState.text, raceState.wpm]);
+        if (text.length === 0) return;
+        const progress = Math.min(100, (userInput.length / text.length) * 100);
+        updateCurrentUserProgress(progress, wpm);
+    }, [userInput, text, wpm, updateCurrentUserProgress]);
 
     // Handle input
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (raceState.status !== 'running') return;
+        if (status !== 'running') return;
         const newValue = e.target.value;
-        const text = raceState.text;
-        if (raceState.errors >= MAX_ERRORS && newValue.length > raceState.userInput.length) return;
 
-        let newStatus: RaceState['status'] = raceState.status;
-        let newStart = raceState.startTime;
+        // Prevent typing when max errors reached
+        if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
-        let errors = 0;
-        let correct = 0;
-        for (let i = 0; i < newValue.length; i++) {
-            if (i < text.length) {
-                if (newValue[i] !== text[i]) errors++;
-                else correct++;
-            }
-        }
-
-        let newEnd = raceState.endTime;
-        if (newValue.length >= text.length) {
-            newStatus = 'finished';
-            newEnd = Date.now();
-        }
-
-        let wpm = 0;
-        let accuracy = 100;
-        if (newStatus === 'running' || newStatus === 'finished') {
-            const start = newStart ?? raceState.startTime;
-            if (start) {
-                const elapsedMin = ((newEnd ?? Date.now()) - start) / 60000;
-                if (elapsedMin > 0 && correct > 0) {
-                    wpm = Math.floor((correct / 5) / elapsedMin);
-                    accuracy = Math.max(0, 100 - (errors / newValue.length) * 100);
-                }
-            }
-        }
-
-        setRaceState(prev => ({
-            ...prev,
-            userInput: newValue.slice(0, text.length),
-            status: newStatus,
-            startTime: newStart,
-            endTime: newEnd,
-            errors,
-            wpm,
-            accuracy,
-            charsTyped: newValue.length,
-            charsCorrect: correct,
-        }));
+        setUserInput(newValue);
     };
 
     // Save results when finished
     useEffect(() => {
-        if (raceState.status !== 'finished' || isSaving) return;
+        if (status !== 'finished' || isSaving) return;
         const save = async () => {
             setIsSaving(true);
             try {
-                // Frontend-only: Save to local storage via hook
-                saveRace(raceState.wpm, raceState.accuracy);
+                saveRace(wpm, accuracy);
             } catch (e) {
                 console.error('Failed to save race', e);
             } finally {
@@ -183,12 +124,12 @@ export default function QuickRacePage() {
             }
         };
         save();
-    }, [raceState.status, raceState.wpm, raceState.accuracy, isSaving, saveRace]);
+    }, [status, wpm, accuracy, isSaving, saveRace]);
 
     // Render text with styling
     const renderText = useMemo(() => {
-        const textChars = raceState.text.split('');
-        const inputChars = raceState.userInput.split('');
+        const textChars = text.split('');
+        const inputChars = userInput.split('');
         return textChars.map((char, i) => {
             let className = 'transition-colors duration-75 ';
             if (i < inputChars.length) {
@@ -196,7 +137,7 @@ export default function QuickRacePage() {
             } else {
                 className += 'untyped-char';
             }
-            if (i === inputChars.length && raceState.status === 'running') {
+            if (i === inputChars.length && status === 'running') {
                 className += ' current-char-position';
             }
             return (
@@ -205,11 +146,13 @@ export default function QuickRacePage() {
                 </span>
             );
         });
-    }, [raceState.text, raceState.userInput, raceState.status]);
+    }, [text, userInput, status]);
 
-    // Initialise first race on mount
+    // Initialize first race on mount
     useEffect(() => {
+        initializeRacers('user', 'YOU');
         startNewRace();
+        // eslint-disable-next-line react-hooks/exhaustive-rules
     }, []);
 
     return (
@@ -223,11 +166,11 @@ export default function QuickRacePage() {
                         Speed Protocol
                     </h1>
                     <p className="text-[var(--text-secondary)] text-xs font-mono">
-                        STATUS: {raceState.status === 'running' ? 'ACTIVE' : raceState.status.toUpperCase()}
+                        STATUS: {status === 'running' ? 'ACTIVE' : status.toUpperCase()}
                     </p>
                 </div>
 
-                {raceState.status !== 'finished' && (
+                {status !== 'finished' && (
                     <div className="flex gap-8 font-mono text-xl">
                         <div className="text-center">
                             <span className="text-[var(--text-secondary)] text-xs block">TIMER</span>
@@ -235,12 +178,12 @@ export default function QuickRacePage() {
                         </div>
                         <div className="text-center">
                             <span className="text-[var(--text-secondary)] text-xs block">WPM</span>
-                            <span className="text-[var(--primary)] drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]">{raceState.wpm}</span>
+                            <span className="text-[var(--primary)] drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]">{wpm}</span>
                         </div>
                         <div className="text-center">
                             <span className="text-[var(--text-secondary)] text-xs block">ACCURACY</span>
-                            <span className={raceState.accuracy < 90 ? 'text-[var(--error)]' : 'text-[var(--success)]'}>
-                                {raceState.accuracy.toFixed(0)}%
+                            <span className={accuracy < 90 ? 'text-[var(--error)]' : 'text-[var(--success)]'}>
+                                {accuracy.toFixed(0)}%
                             </span>
                         </div>
                     </div>
@@ -299,19 +242,19 @@ export default function QuickRacePage() {
                     {renderText}
 
                     {/* Hidden Input */}
-                    {raceState.status !== 'finished' && (
+                    {status !== 'finished' && (
                         <input
                             ref={inputRef}
                             className="absolute inset-0 opacity-0 cursor-default"
-                            value={raceState.userInput}
+                            value={userInput}
                             onChange={handleUserInput}
-                            disabled={raceState.status !== 'running'}
+                            disabled={status !== 'running'}
                             autoFocus
                         />
                     )}
 
                     {/* Start Prompt */}
-                    {raceState.status === 'idle' && !preCountdown && (
+                    {status === 'idle' && !preCountdown && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                             <CyberButton onClick={startNewRace} glow>
                                 <Play size={20} /> INITIALIZE RACE
@@ -321,16 +264,16 @@ export default function QuickRacePage() {
                 </div>
 
                 {/* Error Warning */}
-                {raceState.errors > 0 && raceState.status === 'running' && (
+                {errors > 0 && status === 'running' && (
                     <div className="mt-4 flex items-center justify-center text-[var(--error)] animate-pulse font-mono font-bold">
                         <AlertTriangle size={20} className="mr-2" />
-                        WARNING: INTEGRITY COMPROMISED ({raceState.errors}/{MAX_ERRORS})
+                        WARNING: INTEGRITY COMPROMISED ({errors}/{MAX_ERRORS})
                     </div>
                 )}
             </div>
 
             {/* Results Modal */}
-            {raceState.status === 'finished' && (
+            {status === 'finished' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <CyberCard className="max-w-2xl w-full animate-in fade-in zoom-in duration-300 border-[var(--primary)] shadow-[0_0_50px_rgba(0,243,255,0.2)]">
                         <div className="text-center mb-8">
@@ -343,12 +286,12 @@ export default function QuickRacePage() {
                         <div className="grid grid-cols-3 gap-4 mb-8">
                             <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
                                 <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Speed</div>
-                                <div className="text-4xl font-black text-[var(--primary)]">{raceState.wpm}</div>
+                                <div className="text-4xl font-black text-[var(--primary)]">{wpm}</div>
                                 <div className="text-xs text-[var(--text-muted)]">WPM</div>
                             </div>
                             <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
                                 <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Precision</div>
-                                <div className="text-4xl font-black text-[var(--success)]">{raceState.accuracy.toFixed(0)}%</div>
+                                <div className="text-4xl font-black text-[var(--success)]">{accuracy.toFixed(0)}%</div>
                                 <div className="text-xs text-[var(--text-muted)]">ACCURACY</div>
                             </div>
                             <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">

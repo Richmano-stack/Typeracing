@@ -1,34 +1,61 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { TYPING_TEXTS } from '../lib/texts'
+import { useRaceStore } from '../lib/useRaceStore'
+import { useTimerStore } from '../lib/useTimerStore'
 
 interface RaceScreenProps {
   onComplete: () => void
 }
 
 export function RaceScreen({ onComplete }: RaceScreenProps) {
-  const [textIndex] = useState(Math.floor(Math.random() * TYPING_TEXTS.length))
-  const [text] = useState(TYPING_TEXTS[textIndex])
-  const [input, setInput] = useState('')
-  const [startTime, setStartTime] = useState<number | null>(null)
-  const [timeRemaining, setTimeRemaining] = useState(60)
-  const [isActive, setIsActive] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Race store
+  const {
+    text,
+    userInput,
+    wpm,
+    accuracy,
+    status,
+    initializeRace,
+    setUserInput,
+    startRace,
+  } = useRaceStore()
+
+  // Timer store
+  const {
+    elapsed,
+    startTimer,
+    resetTimer,
+    tick,
+  } = useTimerStore()
+
+  const timeRemaining = Math.max(0, 60 - elapsed)
+  const isActive = status === 'running'
+
+  // Initialize race on mount
+  useEffect(() => {
+    const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length)
+    initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race')
+    startRace()
+    resetTimer()
+    startTimer()
+  }, [initializeRace, startRace, resetTimer, startTimer])
 
   // Timer effect
   useEffect(() => {
     if (!isActive || timeRemaining <= 0) {
-      if (timeRemaining <= 0) {
-        setIsActive(false)
+      if (timeRemaining <= 0 && status !== 'finished') {
         sessionStorage.setItem(
           'raceData',
           JSON.stringify({
-            input,
+            input: userInput,
             text,
             timeRemaining: 0,
-            wpm: calculateWPM(input, 60),
-            accuracy: calculateAccuracy(input, text),
+            wpm,
+            accuracy,
           })
         )
         onComplete()
@@ -37,37 +64,15 @@ export function RaceScreen({ onComplete }: RaceScreenProps) {
     }
 
     const timer = setInterval(() => {
-      setTimeRemaining((prev) => prev - 1)
+      tick()
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [isActive, timeRemaining, input, text, onComplete])
+  }, [isActive, timeRemaining, userInput, text, wpm, accuracy, onComplete, tick, status])
 
   const handleInputChange = (e: string) => {
-    if (!startTime && e.length > 0) {
-      setStartTime(Date.now())
-    }
-    setInput(e)
+    setUserInput(e)
   }
-
-  const calculateWPM = (typed: string, seconds: number) => {
-    if (seconds <= 0) return 0
-    const words = typed.trim().length / 5
-    const minutes = seconds / 60
-    return Math.round(words / minutes)
-  }
-
-  const calculateAccuracy = (typed: string, original: string) => {
-    if (original.length === 0) return 0
-    let correct = 0
-    for (let i = 0; i < typed.length; i++) {
-      if (typed[i] === original[i]) correct++
-    }
-    return Math.round((correct / original.length) * 100)
-  }
-
-  const wpm = calculateWPM(input, 60 - timeRemaining)
-  const accuracy = calculateAccuracy(input, text)
 
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -90,12 +95,12 @@ export function RaceScreen({ onComplete }: RaceScreenProps) {
           <div className="bg-card p-4 rounded-lg border border-border">
             <div className="text-sm text-muted-foreground mb-1">Accuracy</div>
             <div className={`text-3xl font-bold ${accuracy >= 95 ? 'text-accent' : accuracy >= 80 ? 'text-primary' : 'text-destructive'}`}>
-              {accuracy}%
+              {Math.round(accuracy)}%
             </div>
           </div>
           <div className="bg-card p-4 rounded-lg border border-border">
             <div className="text-sm text-muted-foreground mb-1">Chars</div>
-            <div className="text-3xl font-bold text-foreground">{input.length}</div>
+            <div className="text-3xl font-bold text-foreground">{userInput.length}</div>
           </div>
         </div>
 
@@ -104,7 +109,7 @@ export function RaceScreen({ onComplete }: RaceScreenProps) {
           <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
             <div
               className="bg-primary h-full transition-all duration-300"
-              style={{ width: `${(input.length / text.length) * 100}%` }}
+              style={{ width: `${(userInput.length / text.length) * 100}%` }}
             />
           </div>
         </div>
@@ -113,13 +118,13 @@ export function RaceScreen({ onComplete }: RaceScreenProps) {
         <div className="bg-card border border-border rounded-lg p-8 mb-8 font-mono text-lg leading-relaxed min-h-40">
           {text.split('').map((char, i) => {
             let charClass = 'text-muted-foreground'
-            if (i < input.length) {
-              if (input[i] === char) {
+            if (i < userInput.length) {
+              if (userInput[i] === char) {
                 charClass = 'char-correct'
               } else {
                 charClass = 'char-incorrect'
               }
-            } else if (i === input.length) {
+            } else if (i === userInput.length) {
               charClass = 'char-current'
             }
             return (
@@ -134,7 +139,7 @@ export function RaceScreen({ onComplete }: RaceScreenProps) {
         <input
           ref={inputRef}
           type="text"
-          value={input}
+          value={userInput}
           onChange={(e) => handleInputChange(e.target.value)}
           disabled={!isActive}
           placeholder="Type here to start..."
