@@ -238,7 +238,6 @@ GithubProvider({
 - **Production**: Use platform environment variables
   - Vercel: Project Settings → Environment Variables
   - Railway: Project → Variables
-  - Docker: Secrets management
 
 ## SQL Injection Protection
 

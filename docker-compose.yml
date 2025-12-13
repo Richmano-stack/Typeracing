@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: typeracer-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: typeracer
+      POSTGRES_PASSWORD: typeracer_password
+      POSTGRES_DB: typeracer_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

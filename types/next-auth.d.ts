@@ -8,13 +8,12 @@ declare module "next-auth" {
             id: string
             email: string
             name: string | null
-            username: string | null
             image: string | null
         } & DefaultSession["user"]
     }
 
     interface User extends DefaultUser {
-        username: string | null
+        // No additional fields needed beyond DefaultUser
     }
 }
 
@@ -23,7 +22,6 @@ declare module "next-auth/jwt" {
     interface JWT extends DefaultJWT {
         id: string
         email: string
-        username: string | null
         provider?: string
     }
 }

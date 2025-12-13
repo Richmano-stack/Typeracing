@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-lock.yaml # or package-lock.json if not using pnpm
+
+# Build & Runtime Artifacts
+build
+dist
+out
+.next # Common Next.js build output
+.cache
+#.env
+#.env.*
+*.log
+
+# Version Control
+.git
+.gitignore
+
+# Editor/OS Files
+.vscode
+.DS_Store

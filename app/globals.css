@@ -43,20 +43,18 @@
 
   /* UNIFIED BACKGROUND COLORS - Change these to update all hover/background effects */
   --bg-primary-subtle: rgba(0, 243, 255, 0.05);
-  /* Very light primary background */
+
   --bg-primary-hover: rgba(0, 243, 255, 0.1);
-  /* Primary hover state */
+
   --bg-secondary-hover: rgba(188, 19, 254, 0.1);
-  /* Accent/secondary hover */
+
   --bg-danger-hover: rgba(255, 0, 85, 0.1);
-  /* Error/danger hover */
+
   --bg-overlay: rgba(0, 0, 0, 0.3);
-  /* Dark overlay */
+
 }
 
-/* ------------------------------
-   GLOBAL STYLES
------------------------------- */
+
 html {
   scroll-behavior: smooth;
 }
@@ -68,7 +66,7 @@ body {
   overflow-x: hidden;
   min-height: 100vh;
 
-  /* Smooth Gradient Background - Less Pixelated */
+
   background:
     radial-gradient(ellipse at 20% 10%, rgba(0, 243, 255, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 90%, rgba(188, 19, 254, 0.08) 0%, transparent 50%),
@@ -76,7 +74,6 @@ body {
   background-attachment: fixed;
 }
 
-/* Optional: Subtle grain texture (much less pixelated than before) */
 body::after {
   content: "";
   position: fixed;
