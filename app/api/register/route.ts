@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma as db } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+
 
 export async function POST(req: Request) {
     try {
@@ -11,7 +14,7 @@ export async function POST(req: Request) {
             return new NextResponse("Missing required fields", { status: 400 });
         }
 
-        const existingUser = await db.user.findUnique({
+        const existingUser = await prisma.user.findUnique({
             where: {
                 email,
             },
@@ -23,7 +26,7 @@ export async function POST(req: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        const user = await db.user.create({
+        const user = await prisma.user.create({
             data: {
                 email,
                 name,
@@ -34,6 +37,6 @@ export async function POST(req: Request) {
         return NextResponse.json(user);
     } catch (error) {
         console.error("[REGISTER_ERROR]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return new NextResponse(`Internal Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
     }
 }

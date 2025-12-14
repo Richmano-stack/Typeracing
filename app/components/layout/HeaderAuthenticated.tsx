@@ -1,0 +1,129 @@
+"use client"
+
+import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { Terminal, LogOut, User, ChevronDown } from 'lucide-react';
+import { signOut } from 'next-auth/react';
+import Image from 'next/image';
+
+interface HeaderAuthenticatedProps {
+    user: {
+        name?: string | null;
+        email?: string | null;
+        image?: string | null;
+    }
+}
+
+const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    return (
+        <header
+            className="fixed top-0 w-full z-50 backdrop-blur-md border-b border-[var(--border)]"
+            style={{
+                backgroundColor: 'rgba(5, 5, 5, 0.8)',
+            }}
+        >
+            <div className="container mx-auto flex justify-between items-center h-16 px-4">
+
+                {/* Logo/Brand */}
+                <Link href="/dashboard" className="group flex items-center gap-2">
+                    <div className="p-2 border border-[var(--primary)] rounded-sm group-hover:bg-[rgba(0,243,255,0.1)] transition-colors">
+                        <Terminal size={20} className="text-[var(--primary)]" />
+                    </div>
+                    <span className="text-xl font-black tracking-tighter text-white uppercase group-hover:text-[var(--primary)] transition-colors">
+                        Type<span className="text-[var(--primary)]">Race</span>
+                    </span>
+                </Link>
+
+                {/* Navigation */}
+                <nav className="hidden md:flex items-center gap-8">
+                    {['Dashboard', 'Race', 'Leaderboard', 'Profile'].map((item) => (
+                        <Link
+                            key={item}
+                            href={`/${item.toLowerCase()}`}
+                            className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors relative group"
+                        >
+                            {item}
+                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--primary)] transition-all group-hover:w-full" />
+                        </Link>
+                    ))}
+                </nav>
+
+                {/* User Menu */}
+                <div className="relative" ref={menuRef}>
+                    <button
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-lg transition-colors"
+                    >
+                        <div className="flex flex-col items-end hidden sm:flex">
+                            <span className="text-sm font-bold text-white">{user.name || 'Racer'}</span>
+                            <span className="text-xs text-[var(--text-secondary)]">Online</span>
+                        </div>
+
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
+                            {user.image ? (
+                                <Image
+                                    src={user.image}
+                                    alt={user.name || 'User'}
+                                    fill
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-[var(--primary)]/10 text-[var(--primary)]">
+                                    <User size={20} />
+                                </div>
+                            )}
+                        </div>
+                        <ChevronDown size={16} className={`text-[var(--text-secondary)] transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {isMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-56 bg-[#0a0a0a] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            <div className="p-4 border-b border-[var(--border)]">
+                                <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                                <p className="text-xs text-[var(--text-secondary)] truncate">{user.email}</p>
+                            </div>
+
+                            <div className="p-2">
+                                <Link
+                                    href="/profile"
+                                    className="flex items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-white hover:bg-white/5 rounded-md transition-colors"
+                                    onClick={() => setIsMenuOpen(false)}
+                                >
+                                    <User size={16} />
+                                    Profile
+                                </Link>
+                                <button
+                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors"
+                                >
+                                    <LogOut size={16} />
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+            </div>
+        </header>
+    );
+};
+
+export default HeaderAuthenticated;
