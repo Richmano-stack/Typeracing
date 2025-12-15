@@ -9,31 +9,56 @@ generator client {
   previewFeatures = ["driverAdapters"]
 }
 
-///////////////////////
-// User Authentication
-///////////////////////
+// =========================================================
+// Modèle 1: User (Statistiques Agrégées et Infos Utilisateur)
+// Correspond à la table 'users'
+// =========================================================
 model User {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  name           String
-  hashedPassword String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  // Identification
+  id       String    @id @default(uuid()) // Utilise UUID pour la clé primaire
+  username String  @unique @db.VarChar(50)
+  email    String  @unique @db.VarChar(100)
+  
+  // Dates
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // Optional: relation to scores
-  scores         Score[]
+  // Statistiques Agrégées (Dénormalisées pour la performance du profil)
+  totalRaces   Int     @default(0)
+  avgWpm       Decimal   @default(0.00) @db.Decimal(5, 2)
+  bestWpm      Decimal   @default(0.00) @db.Decimal(5, 2)
+  avgAccuracy  Decimal   @default(0.00) @db.Decimal(5, 2)
+
+  // Relation: Liste de toutes les courses effectuées par cet utilisateur
+  races Race[] @relation("UserRaces")
+
+  @@map("users") // Assure que le nom de la table en DB est 'users'
 }
 
-///////////////////////
-// Game Scores
-///////////////////////
-model Score {
-  id        Int      @id @default(autoincrement())
-  wpm       Int      // Words per minute
-  accuracy  Float    // Accuracy percentage (0-100)
-  createdAt DateTime @default(now())
+// =========================================================
+// Modèle 2: Race (Détails de Chaque Course)
+// Correspond à la table 'races'
+// =========================================================
+model Race {
+  id             String    @id @default(uuid())
+  
+  // Métriques de Performance
+  wpm            Decimal     @db.Decimal(5, 2)
+  accuracy       Decimal     @db.Decimal(5, 2)
+  timeTakenMs    Int       // Temps en millisecondes
+  errors         Int
+  textHash       String    @db.VarChar(64) // Hash pour identifier le texte de la course
 
-  // Relation to user
-  userId String
-  user   User @relation(fields: [userId], references: [id])
+  // Métriques détaillées (JSONB) - Pour les données par seconde/frappe
+  detailedMetrics Json? // Utilisez 'Json?' si c'est optionnel ou 'Json' si toujours présent
+
+  // Date de fin de la course
+  completedAt    DateTime @default(now())
+
+  // Relation: Utilisateur qui a effectué la course
+  userId         String
+  user           User     @relation("UserRaces", fields: [userId], references: [id])
+
+  @@index([userId]) // Crée un index sur userId pour accélérer la recherche des courses par utilisateur
+  @@map("races") // Assure que le nom de la table en DB est 'races'
 }
