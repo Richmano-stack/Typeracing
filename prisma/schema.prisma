@@ -18,6 +18,7 @@ model User {
   id       String    @id @default(uuid()) // Utilise UUID pour la clé primaire
   username String  @unique @db.VarChar(50)
   email    String  @unique @db.VarChar(100)
+  hashedPassword String
   
   // Dates
   createdAt DateTime @default(now())

@@ -14,7 +14,7 @@ export default function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
-        name: '',
+        username: '',
         email: '',
         password: '',
     });
@@ -66,11 +66,11 @@ export default function RegisterForm() {
                 )}
 
                 <CyberInput
-                    label="Name"
-                    name="name"
+                    label="Username"
+                    name="username"
                     type="text"
-                    placeholder="Enter your name"
-                    value={formData.name}
+                    placeholder="Choose a username"
+                    value={formData.username}
                     onChange={handleChange}
                     icon={<User size={16} />}
                     required

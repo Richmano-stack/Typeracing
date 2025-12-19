@@ -7,8 +7,8 @@ export const TYPING_TEXTS = [
   "The weather today is perfect for staying indoors and improving your typing skills with focused training.",
   "Algorithms and data structures form the foundation of computer science and modern programming.",
   "JavaScript revolutionized web development by enabling interactive experiences in the browser.",
-  "React components promote code reusability and maintainability in modern frontend development.",
-  "Type each character with precision, focus, and determination to overcome your previous records.",
+  "React components promote code reusability and maintainability in modern frontend development.",]
+/*   "Type each character with precision, focus, and determination to overcome your previous records.",
   "The art of typing requires muscle memory, concentration, and a genuine passion for improving oneself.",
   "Every keystroke brings you closer to mastery. Never give up on your goals and dreams today.",
   "Speed typing competitions have become increasingly popular worldwide among computer enthusiasts.",
@@ -63,4 +63,4 @@ export const TYPING_TEXTS = [
   `The cognitive benefits of regular typing practice extend beyond mere speed or accuracy. Typing requires coordination between multiple areas of the brain, including those responsible for language processing, motor control, and memory. Regular practice can improve mental agility, attention span, and multitasking abilities, demonstrating that typing is not only a practical skill but also a form of mental exercise.`,
 
   `Incorporating creative writing into typing practice transforms mundane exercises into engaging challenges that stimulate both imagination and dexterity. Crafting stories, essays, or even fictional dialogues encourages the use of complex sentence structures and vocabulary, while simultaneously honing typing speed. This combination of cognitive stimulation and physical practice ensures that your typing sessions are both productive and enjoyable.`
-];
+]; */

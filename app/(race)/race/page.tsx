@@ -17,7 +17,6 @@ export default function QuickRacePage() {
     const router = useRouter();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
-    const [isSaving, setIsSaving] = React.useState(false);
 
     // Race store
     const {
@@ -27,6 +26,8 @@ export default function QuickRacePage() {
         wpm,
         accuracy,
         errors,
+        startTime,
+        endTime,
         initializeRace,
         setUserInput,
         startRace,
@@ -62,7 +63,6 @@ export default function QuickRacePage() {
         setPreCountdown(true);
         startCountdown(3);
         resetTimer();
-        setIsSaving(false);
     };
 
     // Countdown effect
@@ -110,21 +110,13 @@ export default function QuickRacePage() {
         setUserInput(newValue);
     };
 
-    // Save results when finished
+    // Save to guest stats when finished (local storage only - no server save)
     useEffect(() => {
-        if (status !== 'finished' || isSaving) return;
-        const save = async () => {
-            setIsSaving(true);
-            try {
-                saveRace(wpm, accuracy);
-            } catch (e) {
-                console.error('Failed to save race', e);
-            } finally {
-                setIsSaving(false);
-            }
-        };
-        save();
-    }, [status, wpm, accuracy, isSaving, saveRace]);
+        if (status !== 'finished') return;
+        
+        // Save to guest stats for local tracking only
+        saveRace(wpm, accuracy);
+    }, [status, wpm, accuracy, saveRace]);
 
     // Render text with styling
     const renderText = useMemo(() => {

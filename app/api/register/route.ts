@@ -8,10 +8,10 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { email, name, password } = body;
+        const { email, username, password } = body;
 
-        if (!email || !name || !password) {
-            return new NextResponse("Missing required fields", { status: 400 });
+        if (!email || !username || !password) {
+            return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
         }
 
         const existingUser = await prisma.user.findUnique({
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         });
 
         if (existingUser) {
-            return new NextResponse("User already exists", { status: 400 });
+            return NextResponse.json({ message: "User already exists" }, { status: 400 });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         const user = await prisma.user.create({
             data: {
                 email,
-                name,
+                username,
                 hashedPassword,
             },
         });
@@ -37,6 +37,6 @@ export async function POST(req: Request) {
         return NextResponse.json(user);
     } catch (error) {
         console.error("[REGISTER_ERROR]", error);
-        return new NextResponse(`Internal Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
+        return NextResponse.json({ message: `Internal Error: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
     }
 }
