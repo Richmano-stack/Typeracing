@@ -42,6 +42,8 @@ export const authOptions: AuthOptions = {
             if (token && session.user) {
                 // Ensure user ID is set from token.sub
                 session.user.id = (token.sub as string) || (token.id as string);
+                // Populate name from username stored in token
+                session.user.name = (token.username as string) || session.user.email || null;
             }
             return session;
         },
@@ -51,16 +53,19 @@ export const authOptions: AuthOptions = {
                 token.sub = user.id;
                 // Also store id separately for easier access
                 token.id = user.id;
+                // Store username for session
+                token.username = (user as any).username;
             } else if (token.email && !token.sub) {
-                // Fallback: if token doesn't have sub but has email, fetch user ID from database
+                // Fallback: if token doesn't have sub but has email, fetch user ID and username from database
                 try {
                     const dbUser = await db.user.findUnique({
                         where: { email: token.email as string },
-                        select: { id: true },
+                        select: { id: true, username: true },
                     });
                     if (dbUser) {
                         token.sub = dbUser.id;
                         token.id = dbUser.id;
+                        token.username = dbUser.username;
                     }
                 } catch (error) {
                     console.error("[AUTH] Error fetching user ID:", error);

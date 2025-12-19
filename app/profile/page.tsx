@@ -1,47 +1,101 @@
-"use client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { User, Activity, Trophy, Flag, Zap, Target } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import CyberCard from '@/components/ui/CyberCard';
 
-import React from 'react';
-import { User, Activity, Trophy, Flag } from 'lucide-react';
+const ProfilePage = async () => {
+    const session = await getServerSession(authOptions);
 
-// StatCard component
-const StatCard = ({ icon: Icon, title, value }: { icon: any; title: string; value: React.ReactNode }) => (
-    <div className="p-5 ui-card flex flex-col items-start" style={{ backgroundColor: 'var(--bg-card)' }}>
-        <Icon size={32} className="mb-3" style={{ color: 'var(--accent)' }} />
-        <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{title}</p>
-    </div>
-);
+    if (!session || !session.user) {
+        redirect('/login');
+    }
 
-const ProfilePage = () => {
-    // Frontend-only: Use mock user data
+    // Fetch user data from database
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+            username: true,
+            createdAt: true,
+            bestWpm: true,
+            avgWpm: true,
+            totalRaces: true,
+            avgAccuracy: true,
+        },
+    });
+
+    if (!user) {
+        redirect('/login');
+    }
+
+    // Format joining date on server side to avoid hydration issues
+    const formatDate = (date: Date) => {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const displayUser = {
-        username: 'Demo Racer',
-        bestWpm: 0,
-        avgWpm: 0,
-        racesCompleted: 0,
-        accuracy: 0,
-        joinedDate: new Date().toLocaleDateString(),
+        username: user.username,
+        bestWpm: Math.round(Number(user.bestWpm) || 0),
+        avgWpm: Math.round(Number(user.avgWpm) || 0),
+        racesCompleted: user.totalRaces || 0,
+        accuracy: Math.round(Number(user.avgAccuracy) || 0),
+        joinedDate: formatDate(user.createdAt),
     };
 
     return (
-        <div className="container mx-auto p-4 md:p-8 min-h-[80vh]">
-            {/* Header */}
-            <header className="flex items-center justify-between mb-8">
-                <h1 className="text-4xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                    <User size={40} className="inline mr-3" style={{ color: 'var(--accent)' }} />
-                    {displayUser.username}'s Profile
-                </h1>
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Joined: {displayUser.joinedDate}
-                </p>
-            </header>
+        <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="max-w-6xl mx-auto space-y-8">
+                {/* Profile Header Banner */}
+                <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] p-8 md:p-12 text-center">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50" />
+                    
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                        <User size={48} className="text-[var(--primary)]" />
+                        <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-white"
+                            style={{ textShadow: '0 0 20px rgba(0,243,255,0.3)' }}>
+                            {displayUser.username}'s Profile
+                        </h1>
+                    </div>
+                    <p className="text-[var(--text-secondary)] font-mono text-sm uppercase">
+                        Joined: {displayUser.joinedDate}
+                    </p>
+                </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                <StatCard icon={Trophy} title="Best WPM" value={displayUser.bestWpm} />
-                <StatCard icon={Activity} title="Average WPM" value={displayUser.avgWpm} />
-                <StatCard icon={Flag} title="Races Completed" value={displayUser.racesCompleted} />
-                <StatCard icon={User} title="Accuracy" value={`${displayUser.accuracy}%`} />
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <CyberCard title="Best WPM" icon={<Zap size={24} />}>
+                        <p className="text-4xl font-black text-[var(--primary)]" style={{ textShadow: '0 0 10px rgba(0,243,255,0.5)' }}>
+                            {displayUser.bestWpm || 0}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Peak Speed</p>
+                    </CyberCard>
+
+                    <CyberCard title="Average WPM" icon={<Activity size={24} />}>
+                        <p className="text-4xl font-black text-white">
+                            {displayUser.avgWpm || 0}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Average Speed</p>
+                    </CyberCard>
+
+                    <CyberCard title="Races Completed" icon={<Trophy size={24} />}>
+                        <p className="text-4xl font-black text-white">
+                            {displayUser.racesCompleted || 0}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Total Races</p>
+                    </CyberCard>
+
+                    <CyberCard title="Accuracy" icon={<Target size={24} />}>
+                        <p className="text-4xl font-black text-[var(--success)]">
+                            {displayUser.accuracy || 0}%
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Average Precision</p>
+                    </CyberCard>
+                </div>
             </div>
         </div>
     );

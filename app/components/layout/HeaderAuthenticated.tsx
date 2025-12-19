@@ -71,7 +71,7 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                         className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-lg transition-colors"
                     >
                         <div className="flex flex-col items-end hidden sm:flex">
-                            <span className="text-sm font-bold text-white">{user.name || 'Racer'}</span>
+                            <span className="text-sm font-bold text-white">{user.name || user.email?.split('@')[0] || 'Racer'}</span>
                             <span className="text-xs text-[var(--text-secondary)]">Online</span>
                         </div>
 
@@ -96,7 +96,7 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                     {isMenuOpen && (
                         <div className="absolute right-0 mt-2 w-56 bg-[#0a0a0a] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                             <div className="p-4 border-b border-[var(--border)]">
-                                <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                                <p className="text-sm font-bold text-white truncate">{user.name || user.email?.split('@')[0] || 'Racer'}</p>
                                 <p className="text-xs text-[var(--text-secondary)] truncate">{user.email}</p>
                             </div>
 
