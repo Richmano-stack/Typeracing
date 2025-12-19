@@ -17,6 +17,9 @@ export default function QuickRacePage() {
     const router = useRouter();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
+    // Track saved race IDs to prevent duplicate submissions
+    // Using Set for O(1) lookup performance
+    const savedRaceIdsRef = useRef<Set<string>>(new Set());
 
     // Race store
     const {
@@ -54,6 +57,7 @@ export default function QuickRacePage() {
     } = useMultiplayerStore();
 
     const [preCountdown, setPreCountdown] = React.useState<boolean>(false);
+    const [isSaving, setIsSaving] = React.useState<boolean>(false);
 
     // Initialize a new race
     const startNewRace = () => {
@@ -63,6 +67,8 @@ export default function QuickRacePage() {
         setPreCountdown(true);
         startCountdown(3);
         resetTimer();
+        // Reset save state for new race
+        setIsSaving(false);
     };
 
     // Countdown effect
@@ -110,13 +116,155 @@ export default function QuickRacePage() {
         setUserInput(newValue);
     };
 
-    // Save to guest stats when finished (local storage only - no server save)
-    useEffect(() => {
-        if (status !== 'finished') return;
+    // Save race results to server (user-initiated)
+    const saveRaceToServer = async (): Promise<boolean> => {
+        // Early return if race not finished
+        if (status !== 'finished') {
+            console.log('[RACE_SAVE] Race not finished, cannot save');
+            return false;
+        }
         
-        // Save to guest stats for local tracking only
-        saveRace(wpm, accuracy);
-    }, [status, wpm, accuracy, saveRace]);
+        // ============================================================
+        // CRITICAL: Capture ALL values SYNCHRONOUSLY
+        // ============================================================
+        // We MUST capture these values immediately because:
+        // 1. A new race might start, resetting the store
+        // 2. React re-renders might change these values
+        // 3. Async operations will use stale closures if we don't capture now
+        
+        const capturedStartTime = startTime;
+        const capturedEndTime = endTime;
+        const capturedWpm = wpm;
+        const capturedAccuracy = accuracy;
+        const capturedErrors = errors;
+        const capturedText = text;
+        const capturedTimer = timer;
+        
+        // ============================================================
+        // Validation: Ensure we have required data
+        // ============================================================
+        if (!capturedStartTime) {
+            console.warn('[RACE_SAVE] Missing required data: startTime');
+            return false;
+        }
+        
+        if (!capturedText || capturedText.length === 0) {
+            console.warn('[RACE_SAVE] Missing required data: text');
+            return false;
+        }
+        
+        // ============================================================
+        // Calculate unique race identifier
+        // ============================================================
+        // Format: `${startTime}-${endTime}-${textHash}`
+        // This ensures uniqueness based on:
+        // - When the race started (startTime)
+        // - When the race ended (endTime)
+        // - What text was typed (textHash)
+        
+        const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
+        
+        // Use endTime if available, otherwise use current time
+        const finalEndTime = capturedEndTime || Date.now();
+        
+        const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
+        
+        // ============================================================
+        // Check if already saved
+        // ============================================================
+        if (savedRaceIdsRef.current.has(raceId)) {
+            console.log('[RACE_SAVE] Race already saved');
+            return true; // Already saved, consider it success
+        }
+        
+        // ============================================================
+        // Mark as saved IMMEDIATELY (synchronously before async operation)
+        // ============================================================
+        // This prevents duplicate saves if user clicks button multiple times
+        savedRaceIdsRef.current.add(raceId);
+        
+        // ============================================================
+        // Calculate timeTakenMs
+        // ============================================================
+        let timeTakenMs: number;
+        if (capturedStartTime && finalEndTime) {
+            timeTakenMs = finalEndTime - capturedStartTime;
+        } else if (capturedStartTime) {
+            // Fallback: use current time if endTime not set
+            timeTakenMs = Date.now() - capturedStartTime;
+        } else {
+            // Last resort: use timer (in seconds, convert to ms)
+            timeTakenMs = capturedTimer * 1000;
+        }
+        
+        // ============================================================
+        // Prepare request payload
+        // ============================================================
+        const payload = {
+            wpm: capturedWpm,
+            accuracy: capturedAccuracy,
+            timeTakenMs: timeTakenMs,
+            errors: capturedErrors,
+            textHash: textHash,
+            raceId: raceId, // Send raceId for server-side duplicate check
+        };
+        
+        // ============================================================
+        // Send POST request to server
+        // ============================================================
+        try {
+            console.log('[RACE_SAVE] Sending race data to server:', {
+                raceId,
+                wpm: capturedWpm,
+                accuracy: capturedAccuracy,
+                timeTakenMs,
+                errors: capturedErrors,
+            });
+            
+            const response = await fetch('/api/races', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            
+            // ============================================================
+            // Handle Response
+            // ============================================================
+            if (response.ok) {
+                const savedRace = await response.json();
+                console.log('[RACE_SAVE] Race saved successfully:', savedRace.id);
+                return true;
+            } else {
+                const errorText = await response.text().catch(() => 'Unknown error');
+                console.error('[RACE_SAVE] Save failed:', response.status, errorText);
+                
+                // Remove from saved set to allow retry
+                savedRaceIdsRef.current.delete(raceId);
+                
+                // Fallback to guest stats
+                saveRace(capturedWpm, capturedAccuracy);
+                
+                return false;
+            }
+        } catch (error) {
+            console.error('[RACE_SAVE] Failed to save race:', error);
+            // Remove from saved set to allow retry
+            savedRaceIdsRef.current.delete(raceId);
+            // Fallback to guest stats
+            saveRace(capturedWpm, capturedAccuracy);
+            return false;
+        }
+    };
+
+    // Cleanup: Clear saved race IDs when component unmounts
+    // This prevents memory leaks and ensures fresh state on remount
+    useEffect(() => {
+        return () => {
+            savedRaceIdsRef.current.clear();
+        };
+    }, []);
 
     // Render text with styling
     const renderText = useMemo(() => {
@@ -304,11 +452,47 @@ export default function QuickRacePage() {
                         )}
 
                         <div className="flex justify-center gap-4">
-                            <CyberButton onClick={startNewRace} glow>
-                                <RefreshCw size={18} /> RESTART SEQUENCE
+                            <CyberButton 
+                                onClick={async () => {
+                                    // Save current race if finished and not already saved
+                                    if (status === 'finished') {
+                                        setIsSaving(true);
+                                        try {
+                                            await saveRaceToServer();
+                                        } catch (error) {
+                                            console.error('Failed to save race:', error);
+                                        } finally {
+                                            setIsSaving(false);
+                                        }
+                                    }
+                                    // Start new race after save completes (or immediately if not finished)
+                                    startNewRace();
+                                }}
+                                glow
+                                disabled={isSaving}
+                            >
+                                <RefreshCw size={18} /> {isSaving ? 'SAVING...' : 'RESTART SEQUENCE'}
                             </CyberButton>
-                            <CyberButton variant="secondary" onClick={() => router.push('/dashboard')}>
-                                EXIT TO HUB
+                            <CyberButton 
+                                variant="secondary" 
+                                onClick={async () => {
+                                    // Save current race if finished and not already saved
+                                    if (status === 'finished') {
+                                        setIsSaving(true);
+                                        try {
+                                            await saveRaceToServer();
+                                        } catch (error) {
+                                            console.error('Failed to save race:', error);
+                                        } finally {
+                                            setIsSaving(false);
+                                        }
+                                    }
+                                    // Navigate to dashboard after save completes (or immediately if not finished)
+                                    router.push('/dashboard');
+                                }}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? 'SAVING...' : 'EXIT TO HUB'}
                             </CyberButton>
                         </div>
                     </CyberCard>

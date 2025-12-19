@@ -38,12 +38,67 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { wpm, accuracy, timeTakenMs, errors, textHash } = body;
+        const { wpm, accuracy, timeTakenMs, errors, textHash, raceId } = body;
 
         if (wpm === undefined || accuracy === undefined || timeTakenMs === undefined || errors === undefined) {
             return new NextResponse("Missing required fields", { status: 400 });
         }
 
+        // Log incoming request for debugging
+        console.log('[RACES_POST] Received race save request:', {
+            userId,
+            wpm,
+            accuracy,
+            timeTakenMs,
+            errors,
+            textHash: textHash?.substring(0, 30),
+            raceId: raceId?.substring(0, 50),
+            timestamp: new Date().toISOString(),
+        });
+
+        // ============================================================
+        // Enhanced Duplicate Prevention
+        // ============================================================
+
+        // Strategy 1: Check by raceId (if provided by client)
+        if (raceId) {
+            const existingRaceById = await prisma.race.findFirst({
+                where: {
+                    userId,
+                    // Note: We don't store raceId in DB, so we check by matching
+                    // the components: startTime (from completedAt - timeTakenMs),
+                    // endTime (completedAt), and textHash
+                    textHash: textHash || "unknown",
+                    // Check if a race with same timing exists
+                    // We'll use completedAt as a proxy for endTime
+                    completedAt: {
+                        // Approximate: completedAt should be close to now
+                        gte: new Date(Date.now() - 10000), // 10 second window
+                    },
+                },
+                orderBy: {
+                    completedAt: 'desc',
+                },
+            });
+            
+            if (existingRaceById) {
+                // Calculate if this is likely the same race
+                const existingTimeDiff = Math.abs(
+                    existingRaceById.timeTakenMs - timeTakenMs
+                );
+                const existingWpmDiff = Math.abs(
+                    Number(existingRaceById.wpm) - wpm
+                );
+                
+                // If timing and WPM are very close, it's likely a duplicate
+                if (existingTimeDiff < 1000 && existingWpmDiff < 1) {
+                    console.log('[RACES_POST] Duplicate race detected by raceId check');
+                    return NextResponse.json(existingRaceById);
+                }
+            }
+        }
+
+        // Strategy 2: Time-based duplicate check (existing logic)
         // Check for duplicate race within the last 5 seconds (same user, textHash, and similar timestamp)
         // This prevents duplicate saves from multiple rapid requests
         const fiveSecondsAgo = new Date(Date.now() - 5000);
@@ -62,6 +117,7 @@ export async function POST(req: Request) {
 
         // If duplicate found, return the existing race (idempotent behavior)
         if (existingRace) {
+            console.log('[RACES_POST] Duplicate race detected by time-based check');
             return NextResponse.json(existingRace);
         }
 
