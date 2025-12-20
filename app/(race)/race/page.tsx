@@ -5,6 +5,7 @@ import { RefreshCw, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useGuestStats } from '@/hooks/useGuestStats';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberCard from '@/components/ui/CyberCard';
 import { useRaceStore } from '@/lib/useRaceStore';
@@ -15,6 +16,7 @@ const MAX_ERRORS = 10;
 
 export default function QuickRacePage() {
     const router = useRouter();
+    const { data: session } = useSession();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
     // Track saved race IDs to prevent duplicate submissions
@@ -118,6 +120,12 @@ export default function QuickRacePage() {
 
     // Save race results to server (user-initiated)
     const saveRaceToServer = async (): Promise<boolean> => {
+        // Early return if not authenticated (guest mode)
+        if (!session?.user) {
+            console.log('[RACE_SAVE] User not authenticated, skipping server save (guest mode)');
+            return false;
+        }
+        
         // Early return if race not finished
         if (status !== 'finished') {
             console.log('[RACE_SAVE] Race not finished, cannot save');
@@ -243,17 +251,12 @@ export default function QuickRacePage() {
                 // Remove from saved set to allow retry
                 savedRaceIdsRef.current.delete(raceId);
                 
-                // Fallback to guest stats
-                saveRace(capturedWpm, capturedAccuracy);
-                
                 return false;
             }
         } catch (error) {
             console.error('[RACE_SAVE] Failed to save race:', error);
             // Remove from saved set to allow retry
             savedRaceIdsRef.current.delete(raceId);
-            // Fallback to guest stats
-            saveRace(capturedWpm, capturedAccuracy);
             return false;
         }
     };
@@ -454,15 +457,21 @@ export default function QuickRacePage() {
                         <div className="flex justify-center gap-4">
                             <CyberButton 
                                 onClick={async () => {
-                                    // Save current race if finished and not already saved
+                                    // Save current race if finished
                                     if (status === 'finished') {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
+                                        // Always save to guest stats cache first
+                                        saveRace(wpm, accuracy);
+                                        
+                                        // Only save to server if authenticated
+                                        if (session?.user) {
+                                            setIsSaving(true);
+                                            try {
+                                                await saveRaceToServer();
+                                            } catch (error) {
+                                                console.error('Failed to save race:', error);
+                                            } finally {
+                                                setIsSaving(false);
+                                            }
                                         }
                                     }
                                     // Start new race after save completes (or immediately if not finished)
@@ -476,15 +485,21 @@ export default function QuickRacePage() {
                             <CyberButton 
                                 variant="secondary" 
                                 onClick={async () => {
-                                    // Save current race if finished and not already saved
+                                    // Save current race if finished
                                     if (status === 'finished') {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
+                                        // Always save to guest stats cache first
+                                        saveRace(wpm, accuracy);
+                                        
+                                        // Only save to server if authenticated
+                                        if (session?.user) {
+                                            setIsSaving(true);
+                                            try {
+                                                await saveRaceToServer();
+                                            } catch (error) {
+                                                console.error('Failed to save race:', error);
+                                            } finally {
+                                                setIsSaving(false);
+                                            }
                                         }
                                     }
                                     // Navigate to dashboard after save completes (or immediately if not finished)
