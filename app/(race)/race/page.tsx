@@ -63,58 +63,87 @@ export default function QuickRacePage() {
 
     // Initialize a new race
     const startNewRace = () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:65',message:'startNewRace called',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
-        setPreCountdown(true);
-        startCountdown(10);
+        // Reset timer FIRST (before starting countdown) to avoid resetting countdown after it's set
         resetTimer();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:71',message:'After resetTimer(), before startCountdown(10)',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        setPreCountdown(true);
+        startCountdown(5);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:74',message:'After startCountdown(10)',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         // Reset save state for new race
         setIsSaving(false);
     };
 
-    // Countdown effect - runs when preCountdown becomes true
+    // Countdown tick effect - runs when preCountdown becomes true
     useEffect(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:87',message:'Countdown tick effect',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         if (!preCountdown) return;
         
-        // Set up interval to tick countdown every second
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:93',message:'Starting countdown interval',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const id = setInterval(() => {
-            tickCountdown();
+            // Read countdown directly from store to avoid closure issues
+            const store = useTimerStore.getState();
+            const currentCountdown = store.countdown;
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:97',message:'Interval tick',data:{currentCountdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            if (currentCountdown > 0) {
+                tickCountdown();
+            }
         }, 1000);
         
         return () => clearInterval(id);
     }, [preCountdown, tickCountdown]);
-    
-    // Effect to handle countdown completion
+
+    // Countdown completion effect - handles race start when countdown reaches 0
     useEffect(() => {
-        if (!preCountdown) return;
-        if (countdown <= 0) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:90',message:'Countdown completion effect',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        if (!preCountdown || countdown !== 0) return;
+
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:93',message:'Countdown reached 0, starting race',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        // Show "GO!" for 800ms before starting race
+        const startTimeout = setTimeout(() => {
             setPreCountdown(false);
             startRace();
             startTimer();
-        }
+        }, 800);
+
+        return () => clearTimeout(startTimeout);
     }, [preCountdown, countdown, startRace, startTimer]);
 
-    // Auto-focus input when race starts
+    // Auto-focus input when race starts (status becomes 'running')
     useEffect(() => {
         if (status === 'running') {
-            inputRef.current?.focus();
+            // Small delay to ensure DOM is ready
+            const focusTimeout = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(focusTimeout);
         }
     }, [status]);
-
     // Timer while running
     useEffect(() => {
         if (status !== 'running') return;
         const id = setInterval(() => tick(), 1000);
         return () => clearInterval(id);
     }, [status, tick]);
-
-    // Update racer progress when user types
-    useEffect(() => {
-        if (text.length === 0) return;
-        const progress = Math.min(100, (userInput.length / text.length) * 100);
-        updateCurrentUserProgress(progress, wpm);
-    }, [userInput, text, wpm, updateCurrentUserProgress]);
 
     // Handle input
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,6 +154,12 @@ export default function QuickRacePage() {
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
         setUserInput(newValue);
+        
+        // Update racer progress directly (no useEffect needed)
+        if (text.length > 0) {
+            const progress = Math.min(100, (newValue.length / text.length) * 100);
+            updateCurrentUserProgress(progress, wpm);
+        }
     };
 
     // Save race results to server (user-initiated)
@@ -342,19 +377,22 @@ export default function QuickRacePage() {
                 )}
             </div>
 
-            {/* Countdown Overlay */}
+            {/* Countdown Overlay - Very transparent so text is clearly visible */}
             {preCountdown && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50">
-                    <div 
-                        className="text-9xl font-black text-[var(--primary)] transition-all duration-300 ease-out"
-                        style={{ 
-                            textShadow: '0 0 50px var(--primary)',
-                            transform: `scale(${countdown > 0 ? 1 + (10 - countdown) * 0.1 : 1.5})`,
-                            opacity: countdown > 0 ? 1 : 0,
-                            animation: countdown > 0 ? 'pulse 0.5s ease-in-out' : 'none'
-                        }}
-                    >
-                        {countdown > 0 ? countdown : 'GO!'}
+                <div className="fixed inset-0 bg-black/10 z-50 pointer-events-none">
+                    {/* Countdown Number - Positioned at top center, above the text area */}
+                    <div className="absolute top-32 left-1/2 transform -translate-x-1/2 z-50">
+                        <div 
+                            className="text-9xl font-black text-[var(--primary)] transition-all duration-300 ease-out"
+                            style={{ 
+                                textShadow: '0 0 50px var(--primary), 0 0 100px var(--primary)',
+                                transform: `scale(${countdown > 0 ? 1 : 1.2})`,
+                                opacity: 1,
+                                animation: countdown > 0 ? 'pulse 1s infinite' : 'none'
+                            }}
+                        >
+                            {countdown > 0 ? countdown : 'GO!'}
+                        </div>
                     </div>
                 </div>
             )}
@@ -390,7 +428,7 @@ export default function QuickRacePage() {
 
                 {/* Text Display (Cockpit) */}
                 <div
-                    className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]"
+                    className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)] z-10"
                     onClick={() => inputRef.current?.focus()}
                 >
                     {/* Corner Accents */}
@@ -409,7 +447,7 @@ export default function QuickRacePage() {
                             value={userInput}
                             onChange={handleUserInput}
                             disabled={status !== 'running'}
-                            autoFocus
+                            autoFocus={status === 'running'}
                         />
                     )}
 
