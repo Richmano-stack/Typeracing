@@ -1,5 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
@@ -87,8 +86,8 @@ function generateRaceData(userId: string, index: number) {
   
   return {
     userId,
-    wpm: new Decimal(wpm.toFixed(2)),
-    accuracy: new Decimal(accuracy.toFixed(2)),
+    wpm: new Prisma.Decimal(wpm.toFixed(2)),
+    accuracy: new Prisma.Decimal(accuracy.toFixed(2)),
     timeTakenMs,
     errors,
     textHash,
