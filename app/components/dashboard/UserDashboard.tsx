@@ -22,6 +22,7 @@ interface UserDashboardProps {
         wpm: number;
         accuracy: number;
         errors: number;
+        raceType: string;
         completedAt: Date;
         formattedDate: string;
     }[];
@@ -107,6 +108,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                             <thead className="bg-[var(--bg-surface)] text-[var(--text-secondary)] font-mono uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4 font-bold">Date</th>
+                                    <th className="px-6 py-4 font-bold">Type</th>
                                     <th className="px-6 py-4 font-bold">WPM</th>
                                     <th className="px-6 py-4 font-bold">Accuracy</th>
                                     <th className="px-6 py-4 font-bold">Errors</th>
@@ -118,6 +120,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                                         <tr key={race.id} className="hover:bg-[var(--bg-surface)] transition-colors">
                                             <td className="px-6 py-4 font-mono text-[var(--text-muted)]">
                                                 {race.formattedDate}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono text-[var(--text-secondary)] uppercase text-xs">
+                                                {race.raceType}
                                             </td>
                                             <td className="px-6 py-4 font-bold text-white">
                                                 {race.wpm}
@@ -132,7 +137,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-8 text-center text-[var(--text-muted)] font-mono">
+                                        <td colSpan={5} className="px-6 py-8 text-center text-[var(--text-muted)] font-mono">
                                             NO RACE DATA FOUND. INITIATE PROTOCOL TO BEGIN.
                                         </td>
                                     </tr>

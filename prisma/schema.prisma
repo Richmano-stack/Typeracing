@@ -48,6 +48,7 @@ model Race {
   timeTakenMs    Int       // Temps en millisecondes
   errors         Int
   textHash       String    @db.VarChar(64) // Hash pour identifier le texte de la course
+  raceType       String    @default("quick") @db.VarChar(20) // Type de course: quick, solo, private
 
   // Métriques détaillées (JSONB) - Pour les données par seconde/frappe
   detailedMetrics Json? // Utilisez 'Json?' si c'est optionnel ou 'Json' si toujours présent

@@ -38,11 +38,13 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { wpm, accuracy, timeTakenMs, errors, textHash, raceId } = body;
+        const { wpm, accuracy, timeTakenMs, errors, textHash, raceId, raceType } = body;
 
         if (wpm === undefined || accuracy === undefined || timeTakenMs === undefined || errors === undefined) {
             return new NextResponse("Missing required fields", { status: 400 });
         }
+
+        const validRaceType = raceType && ['quick', 'solo', 'private'].includes(raceType) ? raceType : 'quick';
 
         // Log incoming request for debugging
         console.log('[RACES_POST] Received race save request:', {
@@ -147,7 +149,8 @@ export async function POST(req: Request) {
                     accuracy: new Prisma.Decimal(accuracy),
                     timeTakenMs,
                     errors,
-                    textHash: textHash || "unknown", // Fallback if not provided
+                    textHash: textHash || "unknown",
+                    raceType: validRaceType,
                 },
             });
 

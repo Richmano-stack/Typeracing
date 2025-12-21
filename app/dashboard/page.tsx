@@ -58,6 +58,7 @@ export default async function DashboardPage() {
         wpm: Math.round(Number(race.wpm)),
         accuracy: Math.round(Number(race.accuracy)),
         errors: race.errors,
+        raceType: race.raceType || 'quick',
         completedAt: race.completedAt,
         formattedDate: formatDate(race.completedAt),
     }));

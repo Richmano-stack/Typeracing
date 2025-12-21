@@ -1,18 +1,25 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { RefreshCw, Trophy, Zap, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
+import { RefreshCw, Trophy, Zap, AlertTriangle, X } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useRaceStore } from '@/lib/useRaceStore';
 import { useTimerStore } from '@/lib/useTimerStore';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useGuestStats } from '@/hooks/useGuestStats';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberCard from '@/components/ui/CyberCard';
 
 const MAX_ERRORS = 10;
 
 const PracticePage: React.FC = () => {
+    const router = useRouter();
+    const { data: session } = useSession();
+    const { stats, saveRace } = useGuestStats();
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [bestWpm, setBestWpm] = React.useState<number | null>(null);
+    /* const savedRaceIdsRef = useRef<Set<string>>(new Set()); */
 
     // Race store
     const {
@@ -22,6 +29,8 @@ const PracticePage: React.FC = () => {
         wpm,
         accuracy,
         errors,
+        startTime,
+        endTime,
         initializeRace,
         setUserInput,
         startRace,
@@ -46,20 +55,143 @@ const PracticePage: React.FC = () => {
         if (saved) setBestWpm(parseInt(saved));
     }, [initializeRace, resetTimer]);
 
-    // Save best WPM when race finishes
-    useEffect(() => {
-        if (status === 'finished' && wpm > 0) {
-            if (bestWpm === null || wpm > bestWpm) {
-                setBestWpm(wpm);
-                localStorage.setItem('bestWpm', wpm.toString());
-            }
+/*     const saveRaceToServer = useCallback(async (): Promise<boolean> => {
+        if (!session?.user) {
+            return false;
         }
-    }, [status, wpm, bestWpm]);
+        
+        if (status !== 'finished') {
+            return false;
+        }
+        
+        const capturedStartTime = startTime;
+        const capturedEndTime = endTime;
+        const capturedWpm = wpm;
+        const capturedAccuracy = accuracy;
+        const capturedErrors = errors;
+        const capturedText = text;
+        const capturedTimer = timer;
+        
+        if (!capturedStartTime || !capturedText || capturedText.length === 0) {
+            return false;
+        }
+        
+        const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
+        const finalEndTime = capturedEndTime || Date.now();
+        const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
+        
+        if (savedRaceIdsRef.current.has(raceId)) {
+            return true;
+        }
+        
+        savedRaceIdsRef.current.add(raceId);
+        
+        let timeTakenMs: number;
+        if (capturedStartTime && finalEndTime) {
+            timeTakenMs = finalEndTime - capturedStartTime;
+        } else if (capturedStartTime) {
+            timeTakenMs = Date.now() - capturedStartTime;
+        } else {
+            timeTakenMs = capturedTimer * 1000;
+        }
+        
+        const payload = {
+            wpm: capturedWpm,
+            accuracy: capturedAccuracy,
+            timeTakenMs: timeTakenMs,
+            errors: capturedErrors,
+            textHash: textHash,
+            raceId: raceId,
+            raceType: 'solo',
+        };
+        
+        try {
+            const response = await fetch('/api/races', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            
+            if (response.ok) {
+                return true;
+            } else {
+                savedRaceIdsRef.current.delete(raceId);
+                return false;
+            }
+        } catch (error) {
+            savedRaceIdsRef.current.delete(raceId);
+            return false;
+        }
+    }, [session, status, startTime, endTime, wpm, accuracy, errors, text, timer]);
+ */
+    // Save best WPM and race data when race finishes
+ /*    const savedRaceRef = useRef<string | null>(null);
+    const hasSavedRef = useRef<boolean>(false); */
+
+    // Save race data when race finishes
+    const hasSavedRef = useRef<boolean>(false);
+    
+    useEffect(() => {
+        if (status !== 'finished' || !startTime || !text || hasSavedRef.current) {
+            if (status !== 'finished') {
+                hasSavedRef.current = false;
+            }
+            return;
+        }
+        
+        hasSavedRef.current = true;
+        const finalEndTime = endTime ?? Date.now();
+        const textHash = text.substring(0, 20).replace(/\s+/g, "_");
+        const raceId = `${startTime}-${finalEndTime}-${textHash}`;
+      
+        // Save locally (guest stats)
+        saveRace(wpm, accuracy, 'solo', errors);
+      
+        // Save best WPM
+        if (bestWpm === null || wpm > bestWpm) {
+            setBestWpm(wpm);
+            localStorage.setItem('bestWpm', wpm.toString());
+        }
+      
+        // Save to server (logged-in users only)
+        if (session?.user) {
+            fetch('/api/races', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wpm,
+                    accuracy,
+                    errors,
+                    timeTakenMs: finalEndTime - startTime,
+                    textHash,
+                    raceId,
+                    raceType: 'solo',
+                }),
+            }).catch(() => {});
+        }
+    }, [status, startTime, endTime, text, wpm, accuracy, errors, session, saveRace, bestWpm]);
+      
+    
+/*     useEffect(() => {
+        if (status !== 'finished') return;
+      
+        const raceKey = `${startTime}-${endTime}`;
+        if (savedRaceRef.current === raceKey) return;
+      
+        savedRaceRef.current = raceKey;
+      
+        saveRace(wpm, accuracy, 'solo', errors);
+        if (session?.user) saveRaceToServer();
+      
+      }, [status]); */
+      
 
     const handleReset = () => {
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(newText, '0', 'practice');
-        resetTimer(); // Reset timer when race is reset
+        resetTimer();
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
@@ -243,6 +375,12 @@ const PracticePage: React.FC = () => {
                         <div className="flex justify-center gap-4">
                             <CyberButton onClick={handleReset} glow>
                                 <RefreshCw size={18} /> PRACTICE AGAIN
+                            </CyberButton>
+                            <CyberButton 
+                                variant="secondary" 
+                                onClick={() => router.push('/dashboard')}
+                            >
+                                <X size={18} /> EXIT
                             </CyberButton>
                         </div>
                     </CyberCard>

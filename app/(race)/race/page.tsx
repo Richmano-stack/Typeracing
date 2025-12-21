@@ -177,6 +177,7 @@ export default function QuickRacePage() {
             errors: capturedErrors,
             textHash: textHash,
             raceId: raceId,
+            raceType: 'quick',
         };
         
         try {
@@ -417,7 +418,7 @@ export default function QuickRacePage() {
                             <CyberButton 
                                 onClick={async () => {
                                     if (status === 'finished') {
-                                        saveRace(wpm, accuracy);
+                                        saveRace(wpm, accuracy, 'quick', errors);
                                         
                                         if (session?.user) {
                                         setIsSaving(true);
@@ -441,7 +442,7 @@ export default function QuickRacePage() {
                                 variant="secondary" 
                                 onClick={async () => {
                                     if (status === 'finished') {
-                                        saveRace(wpm, accuracy);
+                                        saveRace(wpm, accuracy, 'quick', errors);
                                         
                                         if (session?.user) {
                                         setIsSaving(true);
