@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "DATABASE_URL=\"postgresql://user:password@localhost:5432/db\" prisma generate || true"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
