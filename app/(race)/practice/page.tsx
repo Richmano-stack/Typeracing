@@ -220,7 +220,6 @@ const PracticePage: React.FC = () => {
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
         // Start race and timer ONLY on first input (when status is idle and user starts typing)
-        // This ensures timer doesn't start until user actually begins typing
         if (status === "idle" && newValue.length > 0 && userInput.length === 0) {
             startRace();
             startTimer();
