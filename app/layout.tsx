@@ -35,13 +35,13 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <SessionProvider>
-          <GuestStatsProvider>
-            <Header />
-            <main className="pt-16 min-h-screen">{/* Décalage pour le header fixe */}
-              {children}
-            </main>
-            <Footer />
-          </GuestStatsProvider>
+        <GuestStatsProvider>
+          <Header />
+          <main className="pt-16 min-h-screen">{/* Décalage pour le header fixe */}
+            {children}
+          </main>
+          <Footer />
+        </GuestStatsProvider>
         </SessionProvider>
       </body>
     </html>

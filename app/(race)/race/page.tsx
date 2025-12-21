@@ -67,24 +67,33 @@ export default function QuickRacePage() {
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
         setPreCountdown(true);
-        startCountdown(3);
+        startCountdown(10);
         resetTimer();
         // Reset save state for new race
         setIsSaving(false);
     };
 
-    // Countdown effect
+    // Countdown effect - runs when preCountdown becomes true
+    useEffect(() => {
+        if (!preCountdown) return;
+        
+        // Set up interval to tick countdown every second
+        const id = setInterval(() => {
+            tickCountdown();
+        }, 1000);
+        
+        return () => clearInterval(id);
+    }, [preCountdown, tickCountdown]);
+    
+    // Effect to handle countdown completion
     useEffect(() => {
         if (!preCountdown) return;
         if (countdown <= 0) {
             setPreCountdown(false);
             startRace();
             startTimer();
-            return;
         }
-        const id = setInterval(() => tickCountdown(), 1000);
-        return () => clearInterval(id);
-    }, [preCountdown, countdown, startRace, startTimer, tickCountdown]);
+    }, [preCountdown, countdown, startRace, startTimer]);
 
     // Auto-focus input when race starts
     useEffect(() => {
@@ -335,9 +344,17 @@ export default function QuickRacePage() {
 
             {/* Countdown Overlay */}
             {preCountdown && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50">
-                    <div className="text-9xl font-black text-[var(--primary)] animate-pulse" style={{ textShadow: '0 0 50px var(--primary)' }}>
-                        {countdown}
+                <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50">
+                    <div 
+                        className="text-9xl font-black text-[var(--primary)] transition-all duration-300 ease-out"
+                        style={{ 
+                            textShadow: '0 0 50px var(--primary)',
+                            transform: `scale(${countdown > 0 ? 1 + (10 - countdown) * 0.1 : 1.5})`,
+                            opacity: countdown > 0 ? 1 : 0,
+                            animation: countdown > 0 ? 'pulse 0.5s ease-in-out' : 'none'
+                        }}
+                    >
+                        {countdown > 0 ? countdown : 'GO!'}
                     </div>
                 </div>
             )}
@@ -464,13 +481,13 @@ export default function QuickRacePage() {
                                         
                                         // Only save to server if authenticated
                                         if (session?.user) {
-                                            setIsSaving(true);
-                                            try {
-                                                await saveRaceToServer();
-                                            } catch (error) {
-                                                console.error('Failed to save race:', error);
-                                            } finally {
-                                                setIsSaving(false);
+                                        setIsSaving(true);
+                                        try {
+                                            await saveRaceToServer();
+                                        } catch (error) {
+                                            console.error('Failed to save race:', error);
+                                        } finally {
+                                            setIsSaving(false);
                                             }
                                         }
                                     }
@@ -492,13 +509,13 @@ export default function QuickRacePage() {
                                         
                                         // Only save to server if authenticated
                                         if (session?.user) {
-                                            setIsSaving(true);
-                                            try {
-                                                await saveRaceToServer();
-                                            } catch (error) {
-                                                console.error('Failed to save race:', error);
-                                            } finally {
-                                                setIsSaving(false);
+                                        setIsSaving(true);
+                                        try {
+                                            await saveRaceToServer();
+                                        } catch (error) {
+                                            console.error('Failed to save race:', error);
+                                        } finally {
+                                            setIsSaving(false);
                                             }
                                         }
                                     }

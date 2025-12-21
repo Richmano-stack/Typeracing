@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo } from 'react';
-import { RefreshCw, Trophy } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { RefreshCw, Trophy, Zap, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useRaceStore } from '@/lib/useRaceStore';
 import { useTimerStore } from '@/lib/useTimerStore';
+import CyberButton from '@/components/ui/CyberButton';
+import CyberCard from '@/components/ui/CyberCard';
 
 const MAX_ERRORS = 10;
 
@@ -38,10 +40,11 @@ const PracticePage: React.FC = () => {
     useEffect(() => {
         const randomText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(randomText, '0', 'practice');
+        resetTimer(); // Ensure timer is reset on mount - timer will only start when user types
 
         const saved = localStorage.getItem('bestWpm');
         if (saved) setBestWpm(parseInt(saved));
-    }, [initializeRace]);
+    }, [initializeRace, resetTimer]);
 
     // Save best WPM when race finishes
     useEffect(() => {
@@ -56,7 +59,7 @@ const PracticePage: React.FC = () => {
     const handleReset = () => {
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(newText, '0', 'practice');
-        resetTimer();
+        resetTimer(); // Reset timer when race is reset
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
@@ -84,8 +87,9 @@ const PracticePage: React.FC = () => {
         if (status === "finished") return;
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
-        // Start race on first input
-        if (status === "idle" && newValue.length > 0) {
+        // Start race and timer ONLY on first input (when status is idle and user starts typing)
+        // This ensures timer doesn't start until user actually begins typing
+        if (status === "idle" && newValue.length > 0 && userInput.length === 0) {
             startRace();
             startTimer();
         }
@@ -105,95 +109,144 @@ const PracticePage: React.FC = () => {
         : 0;
 
     return (
-        <div className="container mx-auto p-4 md:p-8 min-h-[80vh] flex flex-col items-center">
-            <h1 className="text-3xl font-extrabold mb-8" style={{ color: 'var(--text-primary)' }}>
-                Practice Mode
-            </h1>
-
-            {bestWpm !== null && (
-                <div className="w-full max-w-4xl mb-4 p-3 rounded-lg border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--accent)' }}>
-                    <div className="flex items-center justify-center gap-2">
-                        <Trophy size={20} style={{ color: 'var(--accent)' }} />
-                        <span style={{ color: 'var(--text-primary)' }}>
-                            Personal Best: <strong style={{ color: 'var(--accent)' }}>{bestWpm} WPM</strong>
-                        </span>
-                    </div>
-                </div>
-            )}
-
-            <div className="w-full max-w-4xl mb-6">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Your Progress</span>
-                    <span className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>
-                        {wpm} WPM | {progressPercentage.toFixed(1)}%
-                    </span>
-                </div>
-                <div className="w-full bg-secondary rounded-full h-4 overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
-                    <div className="h-full transition-all duration-300" style={{ width: `${progressPercentage}%`, backgroundColor: 'var(--accent)' }} />
-                </div>
-            </div>
-
-            {status !== 'finished' && (
-                <div className="flex justify-between w-full max-w-4xl mb-4 text-xl font-mono" style={{ color: 'var(--text-secondary)' }}>
-                    <span>Temps: {timer}s</span>
-                    <span>WPM: {wpm}</span>
-                    <span>Erreurs: {errors}/{MAX_ERRORS}</span>
-                    <span>Précision: {accuracy.toFixed(1)}%</span>
-                </div>
-            )}
-
-            <div className="ui-card w-full max-w-4xl p-6 mb-6 text-2xl tracking-wide leading-relaxed" style={{ backgroundColor: 'var(--bg-card)' }}>
-                <p>{renderText}</p>
-            </div>
-
-            {status === 'finished' && (
-                <div className="w-full max-w-4xl mb-6 p-6 rounded-xl border-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--accent)' }}>
-                    <h2 className="text-4xl font-extrabold mb-4 text-center" style={{ color: 'var(--accent)' }}>
-                        {bestWpm !== null && wpm > bestWpm ? '🎉 New Record!' : 'Practice Complete!'}
-                    </h2>
-                    <p className="text-2xl font-bold text-center" style={{ color: 'var(--text-primary)' }}>WPM: {wpm}</p>
-                    <p className="text-lg text-center" style={{ color: 'var(--text-secondary)' }}>
-                        Précision: {accuracy.toFixed(1)}% | Erreurs: {errors}
+        <div className="min-h-screen flex flex-col items-center p-4 md:p-8 relative z-10">
+            {/* HUD Header */}
+            <div className="w-full max-w-5xl mb-8 flex justify-between items-end border-b border-[var(--border)] pb-4">
+                <div>
+                    <h1 className="text-2xl font-black uppercase tracking-widest text-white flex items-center gap-2">
+                        <Zap className="text-[var(--primary)]" />
+                        Practice Protocol
+                    </h1>
+                    <p className="text-[var(--text-secondary)] text-xs font-mono">
+                        STATUS: {status === 'running' ? 'ACTIVE' : status.toUpperCase()}
                     </p>
-                    {bestWpm !== null && wpm <= bestWpm && (
-                        <p className="text-sm mt-2 text-center" style={{ color: 'var(--text-muted)' }}>Best: {bestWpm} WPM</p>
-                    )}
-                    <div className="flex justify-center">
-                        <button onClick={handleReset} className="mt-6 py-3 px-6 rounded-md text-xl font-bold flex items-center transition hover:opacity-90" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }}>
-                            <RefreshCw size={20} className="mr-2" /> Practice Again
-                        </button>
+                </div>
+
+                {status !== 'finished' && (
+                    <div className="flex gap-8 font-mono text-xl">
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">TIMER</span>
+                            <span className="text-white">{timer}s</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">WPM</span>
+                            <span className="text-[var(--primary)] drop-shadow-[0_0_5px_rgba(0,243,255,0.5)]">{wpm}</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-[var(--text-secondary)] text-xs block">ACCURACY</span>
+                            <span className={accuracy < 90 ? 'text-[var(--error)]' : 'text-[var(--success)]'}>
+                                {accuracy.toFixed(0)}%
+                            </span>
+                        </div>
                     </div>
+                )}
+            </div>
+
+            {/* Personal Best Display */}
+            {bestWpm !== null && (
+                <div className="w-full max-w-4xl mb-6">
+                    <CyberCard className="border-[var(--accent)]">
+                        <div className="flex items-center justify-center gap-2">
+                            <Trophy size={20} className="text-[var(--accent)]" />
+                            <span className="text-white font-mono">
+                                Personal Best: <span className="text-[var(--accent)] font-bold">{bestWpm} WPM</span>
+                            </span>
+                        </div>
+                    </CyberCard>
                 </div>
             )}
 
-            <input
-                ref={inputRef}
-                type="text"
-                className="w-full max-w-4xl p-4 text-2xl ui-card focus:outline-none"
-                style={{
-                    backgroundColor: 'var(--bg-surface)',
-                    color: "var(--text-primary)",
-                    borderColor: errors > 0 ? '#ff4d4d' : 'var(--accent)',
-                    caretColor: 'var(--accent)',
-                    opacity: status === 'finished' ? 0 : 1,
-                }}
-                value={userInput}
-                onChange={handleUserInput}
-                disabled={status === 'finished'}
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-            />
+            {/* Main Practice Area */}
+            <div className="w-full max-w-4xl relative">
+                {/* Text Display (Cockpit) */}
+                <div
+                    className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]"
+                    onClick={() => inputRef.current?.focus()}
+                >
+                    {/* Corner Accents */}
+                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--primary)]" />
+                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--primary)]" />
+                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--primary)]" />
+                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--primary)]" />
 
-            {errors >= MAX_ERRORS && (
-                <div className="mt-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 font-bold animate-pulse">
-                    ⚠️ You are typing it wrong! Please correct your errors.
+                    {renderText}
+
+                    {/* Hidden Input */}
+                    {status !== 'finished' && (
+                        <input
+                            ref={inputRef}
+                            className="absolute inset-0 opacity-0 cursor-default"
+                            value={userInput}
+                            onChange={handleUserInput}
+                            autoFocus
+                        />
+                    )}
                 </div>
-            )}
 
-            {status !== 'finished' && (
-                <button onClick={handleReset} className="mt-12 py-2 px-4 rounded-md flex items-center transition hover:opacity-80" style={{ backgroundColor: 'var(--accent)', color: 'var(--bg-base)' }}>
-                    <RefreshCw size={18} className="mr-2" /> Redémarrer
-                </button>
+                {/* Error Warning */}
+                {errors > 0 && status === 'running' && (
+                    <div className="mt-4 flex items-center justify-center text-[var(--error)] animate-pulse font-mono font-bold">
+                        <AlertTriangle size={20} className="mr-2" />
+                        WARNING: INTEGRITY COMPROMISED ({errors}/{MAX_ERRORS})
+                    </div>
+                )}
+
+                {/* Reset Button (when not finished) */}
+                {status !== 'finished' && (
+                    <div className="mt-6 flex justify-center">
+                        <CyberButton onClick={handleReset} variant="secondary">
+                            <RefreshCw size={18} /> RESET PRACTICE
+                        </CyberButton>
+                    </div>
+                )}
+            </div>
+
+            {/* Results Modal */}
+            {status === 'finished' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+                    <CyberCard className="max-w-2xl w-full animate-in fade-in zoom-in duration-300 border-[var(--primary)] shadow-[0_0_50px_rgba(0,243,255,0.2)]">
+                        <div className="text-center mb-8">
+                            <h2 className="text-4xl font-black uppercase text-white mb-2" style={{ textShadow: '0 0 20px var(--primary)' }}>
+                                {bestWpm !== null && wpm > bestWpm ? 'NEW RECORD!' : 'Practice Complete'}
+                            </h2>
+                            <p className="text-[var(--text-secondary)] font-mono">SESSION TERMINATED</p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Speed</div>
+                                <div className="text-4xl font-black text-[var(--primary)]">{wpm}</div>
+                                <div className="text-xs text-[var(--text-muted)]">WPM</div>
+                            </div>
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Precision</div>
+                                <div className="text-4xl font-black text-[var(--success)]">{accuracy.toFixed(0)}%</div>
+                                <div className="text-xs text-[var(--text-muted)]">ACCURACY</div>
+                            </div>
+                            <div className="bg-black/40 p-4 rounded border border-[var(--border)] text-center">
+                                <div className="text-[var(--text-secondary)] text-xs uppercase mb-1">Time</div>
+                                <div className="text-4xl font-black text-white">{timer}s</div>
+                                <div className="text-xs text-[var(--text-muted)]">DURATION</div>
+                            </div>
+                        </div>
+
+                        {bestWpm !== null && (
+                            <div className="mb-8 p-4 bg-[var(--bg-surface)] rounded border border-[var(--border)]">
+                                <h3 className="text-sm font-bold uppercase text-[var(--text-secondary)] mb-2">Personal Best</h3>
+                                <div className="flex justify-between items-center font-mono">
+                                    <span>Highest WPM: <span className="text-white">{bestWpm}</span></span>
+                                    <span>Errors: <span className="text-white">{errors}</span></span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-center gap-4">
+                            <CyberButton onClick={handleReset} glow>
+                                <RefreshCw size={18} /> PRACTICE AGAIN
+                            </CyberButton>
+                        </div>
+                    </CyberCard>
+                </div>
             )}
         </div>
     );
