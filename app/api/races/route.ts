@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export async function POST(req: Request) {
     try {
@@ -143,8 +143,8 @@ export async function POST(req: Request) {
             const race = await tx.race.create({
                 data: {
                     userId,
-                    wpm: new Prisma.Decimal(wpm),
-                    accuracy: new Prisma.Decimal(accuracy),
+                    wpm: new Decimal(wpm),
+                    accuracy: new Decimal(accuracy),
                     timeTakenMs,
                     errors,
                     textHash: textHash || "unknown", // Fallback if not provided
@@ -183,9 +183,9 @@ export async function POST(req: Request) {
                 where: { id: userId },
                 data: {
                     totalRaces: newTotalRaces,
-                    avgWpm: new Prisma.Decimal(newAvgWpm),
-                    avgAccuracy: new Prisma.Decimal(newAvgAccuracy),
-                    bestWpm: new Prisma.Decimal(newBestWpm),
+                    avgWpm: new Decimal(newAvgWpm),
+                    avgAccuracy: new Decimal(newAvgAccuracy),
+                    bestWpm: new Decimal(newBestWpm),
                 },
             });
 
