@@ -62,9 +62,6 @@ export const useTimerStore = create<TimerState>()(
             },
 
             resetTimer: () => {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useTimerStore.ts:64',message:'resetTimer called',data:{currentCountdown:get().countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
                 const state = get();
 
                 if (state.intervalId) {
@@ -77,9 +74,6 @@ export const useTimerStore = create<TimerState>()(
                     status: 'idle',
                     intervalId: null,
                 });
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useTimerStore.ts:76',message:'resetTimer set complete',data:{newCountdown:get().countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
             },
 
             tick: () => {
@@ -89,12 +83,8 @@ export const useTimerStore = create<TimerState>()(
             },
 
             startCountdown: (seconds: number) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useTimerStore.ts:85',message:'startCountdown called',data:{seconds,currentCountdown:get().countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                // #endregion
                 const state = get();
 
-                // Clear any existing interval
                 if (state.intervalId) {
                     clearInterval(state.intervalId);
                 }
@@ -103,9 +93,6 @@ export const useTimerStore = create<TimerState>()(
                     countdown: seconds,
                     status: 'running',
                 });
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useTimerStore.ts:96',message:'startCountdown set complete',data:{newCountdown:get().countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                // #endregion
             },
 
             tickCountdown: () => {

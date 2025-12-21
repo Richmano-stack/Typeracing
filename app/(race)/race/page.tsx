@@ -19,11 +19,8 @@ export default function QuickRacePage() {
     const { data: session } = useSession();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
-    // Track saved race IDs to prevent duplicate submissions
-    // Using Set for O(1) lookup performance
     const savedRaceIdsRef = useRef<Set<string>>(new Set());
 
-    // Race store
     const {
         text,
         userInput,
@@ -39,7 +36,6 @@ export default function QuickRacePage() {
         resetRace,
     } = useRaceStore();
 
-    // Timer store
     const {
         elapsed: timer,
         countdown,
@@ -50,7 +46,6 @@ export default function QuickRacePage() {
         tickCountdown,
     } = useTimerStore();
 
-    // Multiplayer store
     const {
         racers,
         initializeRacers,
@@ -61,45 +56,22 @@ export default function QuickRacePage() {
     const [preCountdown, setPreCountdown] = React.useState<boolean>(false);
     const [isSaving, setIsSaving] = React.useState<boolean>(false);
 
-    // Initialize a new race
     const startNewRace = () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:65',message:'startNewRace called',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
-        // Reset timer FIRST (before starting countdown) to avoid resetting countdown after it's set
         resetTimer();
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:71',message:'After resetTimer(), before startCountdown(10)',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         setPreCountdown(true);
         startCountdown(5);
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:74',message:'After startCountdown(10)',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        // Reset save state for new race
         setIsSaving(false);
     };
 
-    // Countdown tick effect - runs when preCountdown becomes true
     useEffect(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:87',message:'Countdown tick effect',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         if (!preCountdown) return;
         
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:93',message:'Starting countdown interval',data:{countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         const id = setInterval(() => {
-            // Read countdown directly from store to avoid closure issues
             const store = useTimerStore.getState();
             const currentCountdown = store.countdown;
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:97',message:'Interval tick',data:{currentCountdown},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             if (currentCountdown > 0) {
                 tickCountdown();
             }
@@ -108,17 +80,9 @@ export default function QuickRacePage() {
         return () => clearInterval(id);
     }, [preCountdown, tickCountdown]);
 
-    // Countdown completion effect - handles race start when countdown reaches 0
     useEffect(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:90',message:'Countdown completion effect',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         if (!preCountdown || countdown !== 0) return;
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:93',message:'Countdown reached 0, starting race',data:{preCountdown,countdown},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        // Show "GO!" for 800ms before starting race
         const startTimeout = setTimeout(() => {
             setPreCountdown(false);
             startRace();
@@ -128,61 +92,45 @@ export default function QuickRacePage() {
         return () => clearTimeout(startTimeout);
     }, [preCountdown, countdown, startRace, startTimer]);
 
-    // Auto-focus input when race starts (status becomes 'running')
     useEffect(() => {
         if (status === 'running') {
-            // Small delay to ensure DOM is ready
             const focusTimeout = setTimeout(() => {
                 inputRef.current?.focus();
             }, 100);
             return () => clearTimeout(focusTimeout);
         }
     }, [status]);
-    // Timer while running
+
     useEffect(() => {
         if (status !== 'running') return;
         const id = setInterval(() => tick(), 1000);
         return () => clearInterval(id);
     }, [status, tick]);
 
-    // Handle input
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (status !== 'running') return;
         const newValue = e.target.value;
 
-        // Prevent typing when max errors reached
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
         setUserInput(newValue);
         
-        // Update racer progress directly (no useEffect needed)
         if (text.length > 0) {
             const progress = Math.min(100, (newValue.length / text.length) * 100);
             updateCurrentUserProgress(progress, wpm);
         }
     };
 
-    // Save race results to server (user-initiated)
     const saveRaceToServer = async (): Promise<boolean> => {
-        // Early return if not authenticated (guest mode)
         if (!session?.user) {
             console.log('[RACE_SAVE] User not authenticated, skipping server save (guest mode)');
             return false;
         }
         
-        // Early return if race not finished
         if (status !== 'finished') {
             console.log('[RACE_SAVE] Race not finished, cannot save');
             return false;
         }
-        
-        // ============================================================
-        // CRITICAL: Capture ALL values SYNCHRONOUSLY
-        // ============================================================
-        // We MUST capture these values immediately because:
-        // 1. A new race might start, resetting the store
-        // 2. React re-renders might change these values
-        // 3. Async operations will use stale closures if we don't capture now
         
         const capturedStartTime = startTime;
         const capturedEndTime = endTime;
@@ -192,9 +140,6 @@ export default function QuickRacePage() {
         const capturedText = text;
         const capturedTimer = timer;
         
-        // ============================================================
-        // Validation: Ensure we have required data
-        // ============================================================
         if (!capturedStartTime) {
             console.warn('[RACE_SAVE] Missing required data: startTime');
             return false;
@@ -205,65 +150,35 @@ export default function QuickRacePage() {
             return false;
         }
         
-        // ============================================================
-        // Calculate unique race identifier
-        // ============================================================
-        // Format: `${startTime}-${endTime}-${textHash}`
-        // This ensures uniqueness based on:
-        // - When the race started (startTime)
-        // - When the race ended (endTime)
-        // - What text was typed (textHash)
-        
         const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
-        
-        // Use endTime if available, otherwise use current time
         const finalEndTime = capturedEndTime || Date.now();
-        
         const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
         
-        // ============================================================
-        // Check if already saved
-        // ============================================================
         if (savedRaceIdsRef.current.has(raceId)) {
             console.log('[RACE_SAVE] Race already saved');
-            return true; // Already saved, consider it success
+            return true;
         }
         
-        // ============================================================
-        // Mark as saved IMMEDIATELY (synchronously before async operation)
-        // ============================================================
-        // This prevents duplicate saves if user clicks button multiple times
         savedRaceIdsRef.current.add(raceId);
         
-        // ============================================================
-        // Calculate timeTakenMs
-        // ============================================================
         let timeTakenMs: number;
         if (capturedStartTime && finalEndTime) {
             timeTakenMs = finalEndTime - capturedStartTime;
         } else if (capturedStartTime) {
-            // Fallback: use current time if endTime not set
             timeTakenMs = Date.now() - capturedStartTime;
         } else {
-            // Last resort: use timer (in seconds, convert to ms)
             timeTakenMs = capturedTimer * 1000;
         }
         
-        // ============================================================
-        // Prepare request payload
-        // ============================================================
         const payload = {
             wpm: capturedWpm,
             accuracy: capturedAccuracy,
             timeTakenMs: timeTakenMs,
             errors: capturedErrors,
             textHash: textHash,
-            raceId: raceId, // Send raceId for server-side duplicate check
+            raceId: raceId,
         };
         
-        // ============================================================
-        // Send POST request to server
-        // ============================================================
         try {
             console.log('[RACE_SAVE] Sending race data to server:', {
                 raceId,
@@ -281,9 +196,6 @@ export default function QuickRacePage() {
                 body: JSON.stringify(payload),
             });
             
-            // ============================================================
-            // Handle Response
-            // ============================================================
             if (response.ok) {
                 const savedRace = await response.json();
                 console.log('[RACE_SAVE] Race saved successfully:', savedRace.id);
@@ -291,29 +203,22 @@ export default function QuickRacePage() {
             } else {
                 const errorText = await response.text().catch(() => 'Unknown error');
                 console.error('[RACE_SAVE] Save failed:', response.status, errorText);
-                
-                // Remove from saved set to allow retry
                 savedRaceIdsRef.current.delete(raceId);
-                
                 return false;
             }
         } catch (error) {
             console.error('[RACE_SAVE] Failed to save race:', error);
-            // Remove from saved set to allow retry
             savedRaceIdsRef.current.delete(raceId);
             return false;
         }
     };
 
-    // Cleanup: Clear saved race IDs when component unmounts
-    // This prevents memory leaks and ensures fresh state on remount
     useEffect(() => {
         return () => {
             savedRaceIdsRef.current.clear();
         };
     }, []);
 
-    // Render text with styling
     const renderText = useMemo(() => {
         const textChars = text.split('');
         const inputChars = userInput.split('');
@@ -335,7 +240,6 @@ export default function QuickRacePage() {
         });
     }, [text, userInput, status]);
 
-    // Initialize first race on mount
     useEffect(() => {
         initializeRacers('user', 'YOU');
         startNewRace();
@@ -512,12 +416,9 @@ export default function QuickRacePage() {
                         <div className="flex justify-center gap-4">
                             <CyberButton 
                                 onClick={async () => {
-                                    // Save current race if finished
                                     if (status === 'finished') {
-                                        // Always save to guest stats cache first
                                         saveRace(wpm, accuracy);
                                         
-                                        // Only save to server if authenticated
                                         if (session?.user) {
                                         setIsSaving(true);
                                         try {
@@ -529,7 +430,6 @@ export default function QuickRacePage() {
                                             }
                                         }
                                     }
-                                    // Start new race after save completes (or immediately if not finished)
                                     startNewRace();
                                 }}
                                 glow
@@ -540,12 +440,9 @@ export default function QuickRacePage() {
                             <CyberButton 
                                 variant="secondary" 
                                 onClick={async () => {
-                                    // Save current race if finished
                                     if (status === 'finished') {
-                                        // Always save to guest stats cache first
                                         saveRace(wpm, accuracy);
                                         
-                                        // Only save to server if authenticated
                                         if (session?.user) {
                                         setIsSaving(true);
                                         try {
@@ -557,7 +454,6 @@ export default function QuickRacePage() {
                                             }
                                         }
                                     }
-                                    // Navigate to dashboard after save completes (or immediately if not finished)
                                     router.push('/dashboard');
                                 }}
                                 disabled={isSaving}
