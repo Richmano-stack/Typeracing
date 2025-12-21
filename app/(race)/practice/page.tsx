@@ -55,104 +55,22 @@ const PracticePage: React.FC = () => {
         if (saved) setBestWpm(parseInt(saved));
     }, [initializeRace, resetTimer]);
 
-/*     const saveRaceToServer = useCallback(async (): Promise<boolean> => {
-        if (!session?.user) {
-            return false;
-        }
-        
-        if (status !== 'finished') {
-            return false;
-        }
-        
-        const capturedStartTime = startTime;
-        const capturedEndTime = endTime;
-        const capturedWpm = wpm;
-        const capturedAccuracy = accuracy;
-        const capturedErrors = errors;
-        const capturedText = text;
-        const capturedTimer = timer;
-        
-        if (!capturedStartTime || !capturedText || capturedText.length === 0) {
-            return false;
-        }
-        
-        const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
-        const finalEndTime = capturedEndTime || Date.now();
-        const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
-        
-        if (savedRaceIdsRef.current.has(raceId)) {
-            return true;
-        }
-        
-        savedRaceIdsRef.current.add(raceId);
-        
-        let timeTakenMs: number;
-        if (capturedStartTime && finalEndTime) {
-            timeTakenMs = finalEndTime - capturedStartTime;
-        } else if (capturedStartTime) {
-            timeTakenMs = Date.now() - capturedStartTime;
-        } else {
-            timeTakenMs = capturedTimer * 1000;
-        }
-        
-        const payload = {
-            wpm: capturedWpm,
-            accuracy: capturedAccuracy,
-            timeTakenMs: timeTakenMs,
-            errors: capturedErrors,
-            textHash: textHash,
-            raceId: raceId,
-            raceType: 'solo',
-        };
-        
-        try {
-            const response = await fetch('/api/races', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            
-            if (response.ok) {
-                return true;
-            } else {
-                savedRaceIdsRef.current.delete(raceId);
-                return false;
-            }
-        } catch (error) {
-            savedRaceIdsRef.current.delete(raceId);
-            return false;
-        }
-    }, [session, status, startTime, endTime, wpm, accuracy, errors, text, timer]);
- */
-    // Save best WPM and race data when race finishes
- /*    const savedRaceRef = useRef<string | null>(null);
-    const hasSavedRef = useRef<boolean>(false); */
 
-    // Save race data when race finishes
-    const hasSavedRef = useRef<boolean>(false);
-    
-    useEffect(() => {
-        if (status !== 'finished' || !startTime || !text || hasSavedRef.current) {
-            if (status !== 'finished') {
-                hasSavedRef.current = false;
-            }
-            return;
-        }
+    // Save race data function
+    const saveRaceData = useCallback((finalWpm: number, finalAccuracy: number, finalErrors: number) => {
+        if (!startTime || !text) return;
         
-        hasSavedRef.current = true;
         const finalEndTime = endTime ?? Date.now();
         const textHash = text.substring(0, 20).replace(/\s+/g, "_");
         const raceId = `${startTime}-${finalEndTime}-${textHash}`;
       
         // Save locally (guest stats)
-        saveRace(wpm, accuracy, 'solo', errors);
+        saveRace(finalWpm, finalAccuracy, 'solo', finalErrors);
       
         // Save best WPM
-        if (bestWpm === null || wpm > bestWpm) {
-            setBestWpm(wpm);
-            localStorage.setItem('bestWpm', wpm.toString());
+        if (bestWpm === null || finalWpm > bestWpm) {
+            setBestWpm(finalWpm);
+            localStorage.setItem('bestWpm', finalWpm.toString());
         }
       
         // Save to server (logged-in users only)
@@ -161,9 +79,9 @@ const PracticePage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    wpm,
-                    accuracy,
-                    errors,
+                    wpm: finalWpm,
+                    accuracy: finalAccuracy,
+                    errors: finalErrors,
                     timeTakenMs: finalEndTime - startTime,
                     textHash,
                     raceId,
@@ -171,24 +89,11 @@ const PracticePage: React.FC = () => {
                 }),
             }).catch(() => {});
         }
-    }, [status, startTime, endTime, text, wpm, accuracy, errors, session, saveRace, bestWpm]);
-      
-    
-/*     useEffect(() => {
-        if (status !== 'finished') return;
-      
-        const raceKey = `${startTime}-${endTime}`;
-        if (savedRaceRef.current === raceKey) return;
-      
-        savedRaceRef.current = raceKey;
-      
-        saveRace(wpm, accuracy, 'solo', errors);
-        if (session?.user) saveRaceToServer();
-      
-      }, [status]); */
+    }, [startTime, endTime, text, session, saveRace, bestWpm]);
       
 
     const handleReset = () => {
+        hasSavedRef.current = false;
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(newText, '0', 'practice');
         resetTimer();
@@ -213,6 +118,8 @@ const PracticePage: React.FC = () => {
         });
     }, [text, userInput, status]);
 
+    const hasSavedRef = useRef<boolean>(false);
+    
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
 
@@ -224,9 +131,23 @@ const PracticePage: React.FC = () => {
         if (status === "idle" && newValue.length > 0 && userInput.length === 0) {
             startRace();
             startTimer();
+            hasSavedRef.current = false;
         }
 
+        const wasRunning = status === 'running';
+        const willFinish = newValue.length >= text.length;
+        
         setUserInput(newValue);
+        
+        // Check if race just finished and save data
+        if (willFinish && !hasSavedRef.current && wasRunning) {
+            hasSavedRef.current = true;
+            // Use setTimeout to ensure store has updated with final metrics
+            setTimeout(() => {
+                const currentState = useRaceStore.getState();
+                saveRaceData(currentState.wpm, currentState.accuracy, currentState.errors);
+            }, 0);
+        }
     };
 
     // Timer tick

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
 import { RefreshCw, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useGuestStats } from '@/hooks/useGuestStats';
@@ -19,7 +19,6 @@ export default function QuickRacePage() {
     const { data: session } = useSession();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
-    const savedRaceIdsRef = useRef<Set<string>>(new Set());
 
     const {
         text,
@@ -55,8 +54,10 @@ export default function QuickRacePage() {
 
     const [preCountdown, setPreCountdown] = React.useState<boolean>(false);
     const [isSaving, setIsSaving] = React.useState<boolean>(false);
+    const hasSavedRef = useRef<boolean>(false);
 
     const startNewRace = () => {
+        hasSavedRef.current = false;
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
@@ -107,118 +108,63 @@ export default function QuickRacePage() {
         return () => clearInterval(id);
     }, [status, tick]);
 
+    // Save race data function
+    const saveRaceData = useCallback((finalWpm: number, finalAccuracy: number, finalErrors: number) => {
+        if (!startTime || !text) return;
+        
+        const finalEndTime = endTime ?? Date.now();
+        const textHash = text.substring(0, 20).replace(/\s+/g, "_");
+        const raceId = `${startTime}-${finalEndTime}-${textHash}`;
+      
+        // Save locally (guest stats)
+        saveRace(finalWpm, finalAccuracy, 'quick', finalErrors);
+      
+        // Save to server (logged-in users only)
+        if (session?.user) {
+            const timeTakenMs = finalEndTime - startTime;
+            fetch('/api/races', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wpm: finalWpm,
+                    accuracy: finalAccuracy,
+                    errors: finalErrors,
+                    timeTakenMs,
+                    textHash,
+                    raceId,
+                    raceType: 'quick',
+                }),
+            }).catch(() => {});
+        }
+    }, [startTime, endTime, text, session, saveRace]);
+
     const handleUserInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (status !== 'running') return;
         const newValue = e.target.value;
 
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
+        const wasRunning = status === 'running';
+        const willFinish = newValue.length >= text.length;
+        
         setUserInput(newValue);
         
         if (text.length > 0) {
             const progress = Math.min(100, (newValue.length / text.length) * 100);
             updateCurrentUserProgress(progress, wpm);
         }
-    };
-
-    const saveRaceToServer = async (): Promise<boolean> => {
-        if (!session?.user) {
-            console.log('[RACE_SAVE] User not authenticated, skipping server save (guest mode)');
-            return false;
-        }
         
-        if (status !== 'finished') {
-            console.log('[RACE_SAVE] Race not finished, cannot save');
-            return false;
-        }
-        
-        const capturedStartTime = startTime;
-        const capturedEndTime = endTime;
-        const capturedWpm = wpm;
-        const capturedAccuracy = accuracy;
-        const capturedErrors = errors;
-        const capturedText = text;
-        const capturedTimer = timer;
-        
-        if (!capturedStartTime) {
-            console.warn('[RACE_SAVE] Missing required data: startTime');
-            return false;
-        }
-        
-        if (!capturedText || capturedText.length === 0) {
-            console.warn('[RACE_SAVE] Missing required data: text');
-            return false;
-        }
-        
-        const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
-        const finalEndTime = capturedEndTime || Date.now();
-        const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
-        
-        if (savedRaceIdsRef.current.has(raceId)) {
-            console.log('[RACE_SAVE] Race already saved');
-            return true;
-        }
-        
-        savedRaceIdsRef.current.add(raceId);
-        
-        let timeTakenMs: number;
-        if (capturedStartTime && finalEndTime) {
-            timeTakenMs = finalEndTime - capturedStartTime;
-        } else if (capturedStartTime) {
-            timeTakenMs = Date.now() - capturedStartTime;
-        } else {
-            timeTakenMs = capturedTimer * 1000;
-        }
-        
-        const payload = {
-            wpm: capturedWpm,
-            accuracy: capturedAccuracy,
-            timeTakenMs: timeTakenMs,
-            errors: capturedErrors,
-            textHash: textHash,
-            raceId: raceId,
-            raceType: 'quick',
-        };
-        
-        try {
-            console.log('[RACE_SAVE] Sending race data to server:', {
-                raceId,
-                wpm: capturedWpm,
-                accuracy: capturedAccuracy,
-                timeTakenMs,
-                errors: capturedErrors,
-            });
-            
-            const response = await fetch('/api/races', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            
-            if (response.ok) {
-                const savedRace = await response.json();
-                console.log('[RACE_SAVE] Race saved successfully:', savedRace.id);
-                return true;
-            } else {
-                const errorText = await response.text().catch(() => 'Unknown error');
-                console.error('[RACE_SAVE] Save failed:', response.status, errorText);
-                savedRaceIdsRef.current.delete(raceId);
-                return false;
-            }
-        } catch (error) {
-            console.error('[RACE_SAVE] Failed to save race:', error);
-            savedRaceIdsRef.current.delete(raceId);
-            return false;
+        // Check if race just finished and save data
+        if (willFinish && !hasSavedRef.current && wasRunning) {
+            hasSavedRef.current = true;
+            // Use setTimeout to ensure store has updated with final metrics
+            setTimeout(() => {
+                const currentState = useRaceStore.getState();
+                saveRaceData(currentState.wpm, currentState.accuracy, currentState.errors);
+            }, 0);
         }
     };
 
-    useEffect(() => {
-        return () => {
-            savedRaceIdsRef.current.clear();
-        };
-    }, []);
 
     const renderText = useMemo(() => {
         const textChars = text.split('');
@@ -416,50 +362,20 @@ export default function QuickRacePage() {
 
                         <div className="flex justify-center gap-4">
                             <CyberButton 
-                                onClick={async () => {
-                                    if (status === 'finished') {
-                                        saveRace(wpm, accuracy, 'quick', errors);
-                                        
-                                        if (session?.user) {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
-                                            }
-                                        }
-                                    }
+                                onClick={() => {
                                     startNewRace();
                                 }}
                                 glow
-                                disabled={isSaving}
                             >
-                                <RefreshCw size={18} /> {isSaving ? 'SAVING...' : 'RESTART SEQUENCE'}
+                                <RefreshCw size={18} /> RESTART SEQUENCE
                             </CyberButton>
                             <CyberButton 
                                 variant="secondary" 
-                                onClick={async () => {
-                                    if (status === 'finished') {
-                                        saveRace(wpm, accuracy, 'quick', errors);
-                                        
-                                        if (session?.user) {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
-                                            }
-                                        }
-                                    }
+                                onClick={() => {
                                     router.push('/dashboard');
                                 }}
-                                disabled={isSaving}
                             >
-                                {isSaving ? 'SAVING...' : 'EXIT TO HUB'}
+                                EXIT TO HUB
                             </CyberButton>
                         </div>
                     </CyberCard>
