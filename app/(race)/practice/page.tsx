@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useMemo, useRef, useCallback } from 'react';
@@ -19,7 +20,9 @@ const PracticePage: React.FC = () => {
     const { stats, saveRace } = useGuestStats();
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [bestWpm, setBestWpm] = React.useState<number | null>(null);
+    const raceIdRef = useRef<string | null>(null);
 
+    // Race store
     const {
         text,
         userInput,
@@ -35,6 +38,7 @@ const PracticePage: React.FC = () => {
         resetRace,
     } = useRaceStore();
 
+    // Timer store
     const {
         elapsed: timer,
         startTimer,
@@ -42,6 +46,7 @@ const PracticePage: React.FC = () => {
         tick,
     } = useTimerStore();
 
+    // Load best WPM from localStorage on mount
     useEffect(() => {
         const randomText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(randomText, '0', 'practice');
@@ -51,6 +56,73 @@ const PracticePage: React.FC = () => {
         if (saved) setBestWpm(parseInt(saved));
     }, [initializeRace, resetTimer]);
 
+    const saveRaceToServer = useCallback(async (): Promise<boolean> => {
+        if (!session?.user) {
+            return false;
+        }
+        
+        if (status !== 'finished') {
+            return false;
+        }
+        
+        const raceId = raceIdRef.current;
+        if (!raceId) {
+            return false;
+        }
+        
+        const capturedStartTime = startTime;
+        const capturedEndTime = endTime;
+        const capturedWpm = wpm;
+        const capturedAccuracy = accuracy;
+        const capturedErrors = errors;
+        const capturedText = text;
+        const capturedTimer = timer;
+        
+        if (!capturedStartTime || !capturedText || capturedText.length === 0) {
+            return false;
+        }
+        
+        const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
+        
+        let timeTakenMs: number;
+        if (capturedStartTime && capturedEndTime) {
+            timeTakenMs = capturedEndTime - capturedStartTime;
+        } else if (capturedStartTime) {
+            timeTakenMs = Date.now() - capturedStartTime;
+        } else {
+            timeTakenMs = capturedTimer * 1000;
+        }
+        
+        const payload = {
+            wpm: capturedWpm,
+            accuracy: capturedAccuracy,
+            timeTakenMs: timeTakenMs,
+            errors: capturedErrors,
+            textHash: textHash,
+            raceId: raceId,
+            raceType: 'solo',
+        };
+        
+        try {
+            const response = await fetch('/api/races', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            
+            if (response.ok) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (error) {
+            return false;
+        }
+    }, [session, status, startTime, endTime, wpm, accuracy, errors, text, timer]);
+
+    // Save best WPM and race data when race finishes
     const hasSavedRef = useRef<boolean>(false);
     
     useEffect(() => {
@@ -62,35 +134,39 @@ const PracticePage: React.FC = () => {
         }
         
         hasSavedRef.current = true;
-        const finalEndTime = endTime ?? Date.now();
-        const textHash = text.substring(0, 20).replace(/\s+/g, "_");
-        const raceId = `${startTime}-${finalEndTime}-${textHash}`;
       
+        // Save locally (guest stats)
         saveRace(wpm, accuracy, 'solo', errors);
       
+        // Save best WPM
         if (bestWpm === null || wpm > bestWpm) {
             setBestWpm(wpm);
             localStorage.setItem('bestWpm', wpm.toString());
         }
       
+        // Save to server (logged-in users only)
         if (session?.user) {
-            fetch('/api/races', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wpm,
-                    accuracy,
-                    errors,
-                    timeTakenMs: finalEndTime - startTime,
-                    textHash,
-                    raceId,
-                    raceType: 'solo',
-                }),
-            }).catch(() => {});
+            saveRaceToServer();
         }
-    }, [status, startTime, endTime, text, wpm, accuracy, errors, session, saveRace, bestWpm]);
+    }, [status, startTime, text, wpm, accuracy, errors, session, saveRace, saveRaceToServer, bestWpm]);
+      
+    
+/*     useEffect(() => {
+        if (status !== 'finished') return;
+      
+        const raceKey = `${startTime}-${endTime}`;
+        if (savedRaceRef.current === raceKey) return;
+      
+        savedRaceRef.current = raceKey;
+      
+        saveRace(wpm, accuracy, 'solo', errors);
+        if (session?.user) saveRaceToServer();
+      
+      }, [status]); */
+      
 
     const handleReset = () => {
+        raceIdRef.current = null;
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(newText, '0', 'practice');
         resetTimer();
@@ -121,7 +197,10 @@ const PracticePage: React.FC = () => {
         if (status === "finished") return;
         if (errors >= MAX_ERRORS && newValue.length > userInput.length) return;
 
+        // Start race and timer ONLY on first input (when status is idle and user starts typing)
+        // This ensures timer doesn't start until user actually begins typing
         if (status === "idle" && newValue.length > 0 && userInput.length === 0) {
+            raceIdRef.current = crypto.randomUUID();
             startRace();
             startTimer();
         }
@@ -129,6 +208,7 @@ const PracticePage: React.FC = () => {
         setUserInput(newValue);
     };
 
+    // Timer tick
     useEffect(() => {
         if (status !== 'running') return;
         const interval = setInterval(() => tick(), 1000);
@@ -141,6 +221,7 @@ const PracticePage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col items-center p-4 md:p-8 relative z-10">
+            {/* HUD Header */}
             <div className="w-full max-w-5xl mb-8 flex justify-between items-end border-b border-[var(--border)] pb-4">
                 <div>
                     <h1 className="text-2xl font-black uppercase tracking-widest text-white flex items-center gap-2">
@@ -172,6 +253,7 @@ const PracticePage: React.FC = () => {
                 )}
             </div>
 
+            {/* Personal Best Display */}
             {bestWpm !== null && (
                 <div className="w-full max-w-4xl mb-6">
                     <CyberCard className="border-[var(--accent)]">
@@ -185,11 +267,14 @@ const PracticePage: React.FC = () => {
                 </div>
             )}
 
+            {/* Main Practice Area */}
             <div className="w-full max-w-4xl relative">
+                {/* Text Display (Cockpit) */}
                 <div
                     className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]"
                     onClick={() => inputRef.current?.focus()}
                 >
+                    {/* Corner Accents */}
                     <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--primary)]" />
                     <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--primary)]" />
                     <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--primary)]" />
@@ -197,6 +282,7 @@ const PracticePage: React.FC = () => {
 
                     {renderText}
 
+                    {/* Hidden Input */}
                     {status !== 'finished' && (
                         <input
                             ref={inputRef}
@@ -208,6 +294,7 @@ const PracticePage: React.FC = () => {
                     )}
                 </div>
 
+                {/* Error Warning */}
                 {errors > 0 && status === 'running' && (
                     <div className="mt-4 flex items-center justify-center text-[var(--error)] animate-pulse font-mono font-bold">
                         <AlertTriangle size={20} className="mr-2" />
@@ -215,6 +302,7 @@ const PracticePage: React.FC = () => {
                     </div>
                 )}
 
+                {/* Reset Button (when not finished) */}
                 {status !== 'finished' && (
                     <div className="mt-6 flex justify-center">
                         <CyberButton onClick={handleReset} variant="secondary">
@@ -224,6 +312,7 @@ const PracticePage: React.FC = () => {
                 )}
             </div>
 
+            {/* Results Modal */}
             {status === 'finished' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <CyberCard className="max-w-2xl w-full animate-in fade-in zoom-in duration-300 border-[var(--primary)] shadow-[0_0_50px_rgba(0,243,255,0.2)]">

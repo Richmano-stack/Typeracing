@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
 import { RefreshCw, Zap, Play, AlertTriangle } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useGuestStats } from '@/hooks/useGuestStats';
@@ -19,7 +19,7 @@ export default function QuickRacePage() {
     const { data: session } = useSession();
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
-    const savedRaceIdsRef = useRef<Set<string>>(new Set());
+    const raceIdRef = useRef<string | null>(null);
 
     const {
         text,
@@ -54,16 +54,15 @@ export default function QuickRacePage() {
     } = useMultiplayerStore();
 
     const [preCountdown, setPreCountdown] = React.useState<boolean>(false);
-    const [isSaving, setIsSaving] = React.useState<boolean>(false);
 
     const startNewRace = () => {
+        raceIdRef.current = null;
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
         resetTimer();
         setPreCountdown(true);
         startCountdown(5);
-        setIsSaving(false);
     };
 
     useEffect(() => {
@@ -85,6 +84,7 @@ export default function QuickRacePage() {
 
         const startTimeout = setTimeout(() => {
             setPreCountdown(false);
+            raceIdRef.current = crypto.randomUUID();
             startRace();
             startTimer();
         }, 800);
@@ -121,49 +121,38 @@ export default function QuickRacePage() {
         }
     };
 
-    const saveRaceToServer = async (): Promise<boolean> => {
+    const saveRaceToServer = useCallback(async (): Promise<boolean> => {
         if (!session?.user) {
-            console.log('[RACE_SAVE] User not authenticated, skipping server save (guest mode)');
             return false;
         }
         
         if (status !== 'finished') {
-            console.log('[RACE_SAVE] Race not finished, cannot save');
             return false;
         }
         
+        const raceId = raceIdRef.current;
+        if (!raceId) {
+            return false;
+        }
+        
+        // Capture all values at function entry to avoid dependency on changing values
         const capturedStartTime = startTime;
         const capturedEndTime = endTime;
         const capturedWpm = wpm;
         const capturedAccuracy = accuracy;
         const capturedErrors = errors;
         const capturedText = text;
-        const capturedTimer = timer;
+        const capturedTimer = useTimerStore.getState().elapsed;
         
-        if (!capturedStartTime) {
-            console.warn('[RACE_SAVE] Missing required data: startTime');
-            return false;
-        }
-        
-        if (!capturedText || capturedText.length === 0) {
-            console.warn('[RACE_SAVE] Missing required data: text');
+        if (!capturedStartTime || !capturedText || capturedText.length === 0) {
             return false;
         }
         
         const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
-        const finalEndTime = capturedEndTime || Date.now();
-        const raceId = `${capturedStartTime}-${finalEndTime}-${textHash}`;
-        
-        if (savedRaceIdsRef.current.has(raceId)) {
-            console.log('[RACE_SAVE] Race already saved');
-            return true;
-        }
-        
-        savedRaceIdsRef.current.add(raceId);
         
         let timeTakenMs: number;
-        if (capturedStartTime && finalEndTime) {
-            timeTakenMs = finalEndTime - capturedStartTime;
+        if (capturedStartTime && capturedEndTime) {
+            timeTakenMs = capturedEndTime - capturedStartTime;
         } else if (capturedStartTime) {
             timeTakenMs = Date.now() - capturedStartTime;
         } else {
@@ -181,14 +170,6 @@ export default function QuickRacePage() {
         };
         
         try {
-            console.log('[RACE_SAVE] Sending race data to server:', {
-                raceId,
-                wpm: capturedWpm,
-                accuracy: capturedAccuracy,
-                timeTakenMs,
-                errors: capturedErrors,
-            });
-            
             const response = await fetch('/api/races', {
                 method: 'POST',
                 headers: {
@@ -198,27 +179,45 @@ export default function QuickRacePage() {
             });
             
             if (response.ok) {
-                const savedRace = await response.json();
-                console.log('[RACE_SAVE] Race saved successfully:', savedRace.id);
                 return true;
             } else {
-                const errorText = await response.text().catch(() => 'Unknown error');
-                console.error('[RACE_SAVE] Save failed:', response.status, errorText);
-                savedRaceIdsRef.current.delete(raceId);
                 return false;
             }
         } catch (error) {
-            console.error('[RACE_SAVE] Failed to save race:', error);
-            savedRaceIdsRef.current.delete(raceId);
             return false;
         }
-    };
+    }, [session, status, startTime, endTime, wpm, accuracy, errors, text]);
 
+
+    // Save race data when race finishes
+    const hasSavedRef = useRef<boolean>(false);
+    const saveRaceToServerRef = useRef(saveRaceToServer);
+    // Keep ref updated with latest callback
     useEffect(() => {
-        return () => {
-            savedRaceIdsRef.current.clear();
-        };
-    }, []);
+        saveRaceToServerRef.current = saveRaceToServer;
+    }, [saveRaceToServer]);
+    
+    useEffect(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/b9c85705-8d2a-4030-b8e1-a65a950860c4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:191',message:'save effect triggered',data:{status,startTime:!!startTime,text:!!text,hasSaved:hasSavedRef.current,wpm,accuracy,errors,timer:useTimerStore.getState().elapsed,endTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        if (status !== 'finished' || !startTime || !text || hasSavedRef.current) {
+            if (status !== 'finished') {
+                hasSavedRef.current = false;
+            }
+            return;
+        }
+        hasSavedRef.current = true;
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/b9c85705-8d2a-4030-b8e1-a65a950860c4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'race/page.tsx:198',message:'saving race',data:{wpm,accuracy,errors,hasSession:!!session?.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        // Save locally (guest stats)
+        saveRace(wpm, accuracy, 'quick', errors);
+        // Save to server (logged-in users only)
+        if (session?.user) {
+            saveRaceToServerRef.current();
+        }
+    }, [status, startTime, text, wpm, accuracy, errors, session, saveRace]);
 
     const renderText = useMemo(() => {
         const textChars = text.split('');
@@ -399,50 +398,16 @@ export default function QuickRacePage() {
 
                         <div className="flex justify-center gap-4">
                             <CyberButton 
-                                onClick={async () => {
-                                    if (status === 'finished') {
-                                        saveRace(wpm, accuracy, 'quick', errors);
-                                        
-                                        if (session?.user) {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
-                                            }
-                                        }
-                                    }
-                                    startNewRace();
-                                }}
+                                onClick={startNewRace}
                                 glow
-                                disabled={isSaving}
                             >
-                                <RefreshCw size={18} /> {isSaving ? 'SAVING...' : 'RESTART SEQUENCE'}
+                                <RefreshCw size={18} /> RESTART SEQUENCE
                             </CyberButton>
                             <CyberButton 
                                 variant="secondary" 
-                                onClick={async () => {
-                                    if (status === 'finished') {
-                                        saveRace(wpm, accuracy, 'quick', errors);
-                                        
-                                        if (session?.user) {
-                                        setIsSaving(true);
-                                        try {
-                                            await saveRaceToServer();
-                                        } catch (error) {
-                                            console.error('Failed to save race:', error);
-                                        } finally {
-                                            setIsSaving(false);
-                                            }
-                                        }
-                                    }
-                                    router.push('/dashboard');
-                                }}
-                                disabled={isSaving}
+                                onClick={() => router.push('/dashboard')}
                             >
-                                {isSaving ? 'SAVING...' : 'EXIT TO HUB'}
+                                EXIT TO HUB
                             </CyberButton>
                         </div>
                     </CyberCard>
