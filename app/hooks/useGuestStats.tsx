@@ -44,23 +44,13 @@ export const GuestStatsProvider = ({ children }: { children: ReactNode }) => {
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGuestStats.tsx:46',message:'Loaded from localStorage',data:{hasRecentRaces:!!parsed.recentRaces,recentRacesType:typeof parsed.recentRaces,recentRacesIsArray:Array.isArray(parsed.recentRaces),recentRacesValue:parsed.recentRaces},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-                    // #endregion
-                    // Merge with defaultStats to ensure all fields are present (especially recentRaces)
                     const merged = {
                         ...defaultStats,
                         ...parsed,
                         recentRaces: Array.isArray(parsed.recentRaces) ? parsed.recentRaces : defaultStats.recentRaces,
                     };
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGuestStats.tsx:52',message:'After merge with defaultStats',data:{hasRecentRaces:!!merged.recentRaces,recentRacesType:typeof merged.recentRaces,recentRacesIsArray:Array.isArray(merged.recentRaces)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-                    // #endregion
                     return merged;
                 } catch {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGuestStats.tsx:57',message:'JSON parse failed, using defaultStats',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-                    // #endregion
                     return defaultStats;
                 }
             }
@@ -76,9 +66,6 @@ export const GuestStatsProvider = ({ children }: { children: ReactNode }) => {
 
     const saveRace = useCallback((wpm: number, accuracy: number, raceType: string = 'quick', errors: number = 0) => {
         setStats((prev) => {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGuestStats.tsx:70',message:'saveRace called - checking prev.recentRaces',data:{hasRecentRaces:!!prev.recentRaces,recentRacesType:typeof prev.recentRaces,recentRacesIsArray:Array.isArray(prev.recentRaces),recentRacesValue:prev.recentRaces,prevKeys:Object.keys(prev)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             const newRacesPlayed = prev.racesPlayed + 1;
             const newAccuracy = ((prev.accuracy * prev.racesPlayed) + accuracy) / newRacesPlayed;
 
@@ -91,11 +78,7 @@ export const GuestStatsProvider = ({ children }: { children: ReactNode }) => {
                 completedAt: new Date().toISOString(),
             };
 
-            // Ensure recentRaces is always an array (defensive check)
             const prevRecentRaces = Array.isArray(prev.recentRaces) ? prev.recentRaces : [];
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/c7f103f5-706e-4173-b524-77af058e477e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGuestStats.tsx:87',message:'Before spreading prevRecentRaces',data:{recentRacesType:typeof prevRecentRaces,recentRacesIsArray:Array.isArray(prevRecentRaces),prevRecentRacesLength:prevRecentRaces.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             const updatedRecentRaces = [newRace, ...prevRecentRaces].slice(0, 10);
 
             return {

@@ -32,8 +32,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
     return (
         <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-6xl mx-auto space-y-8">
-
-                {/* Welcome Banner */}
                 <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] p-8 md:p-12 text-center">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50" />
 
@@ -96,7 +94,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                     </CyberCard>
                 </div>
 
-                {/* Recent Races */}
                 <div className="space-y-4">
                     <h2 className="text-2xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         <Swords className="text-[var(--primary)]" />

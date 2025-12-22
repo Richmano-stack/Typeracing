@@ -10,7 +10,6 @@ const CreateRacePage: React.FC = () => {
     const [isCopied, setIsCopied] = useState(false);
 
     const generateLink = () => {
-        // In a real app, this would call an API to create a unique race ID
         const uniqueId = Math.random().toString(36).substring(2, 10);
         setInviteLink(`${window.location.origin}/race/invite/${uniqueId}`);
         setIsCopied(false);
@@ -27,7 +26,6 @@ const CreateRacePage: React.FC = () => {
     return (
         <div className="min-h-screen flex items-center justify-center p-4 md:p-8 relative z-10">
             <div className="w-full max-w-2xl">
-                {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-4">
                         <Lock size={48} className="text-[var(--accent)]" style={{ filter: 'drop-shadow(0 0 10px rgba(188, 19, 254, 0.5))' }} />
@@ -41,9 +39,7 @@ const CreateRacePage: React.FC = () => {
                     </p>
                 </div>
 
-                {/* Main Card */}
                 <CyberCard className="border-[var(--accent)]">
-                    {/* Corner Accents */}
                     <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-[var(--accent)]" />
                     <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[var(--accent)]" />
                     <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[var(--accent)]" />
@@ -142,7 +138,6 @@ const CreateRacePage: React.FC = () => {
                     </div>
                 </CyberCard>
 
-                {/* Info Footer */}
                 <div className="mt-6 text-center">
                     <p className="text-xs text-[var(--text-muted)] font-mono">
                         SYSTEM: PRIVATE_LOBBY_v2.1 | STATUS: OPERATIONAL

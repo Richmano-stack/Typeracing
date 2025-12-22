@@ -4,13 +4,10 @@ import { devtools } from 'zustand/middleware';
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'stopped';
 
 interface TimerState {
-    // State
-    elapsed: number; // seconds
-    countdown: number; // seconds
+    elapsed: number;
+    countdown: number;
     status: TimerStatus;
     intervalId: NodeJS.Timeout | null;
-
-    // Actions
     startTimer: () => void;
     pauseTimer: () => void;
     stopTimer: () => void;
@@ -23,17 +20,13 @@ interface TimerState {
 export const useTimerStore = create<TimerState>()(
     devtools(
         (set, get) => ({
-            // Initial state
             elapsed: 0,
             countdown: 0,
             status: 'idle',
             intervalId: null,
-
-            // Actions
             startTimer: () => {
                 const state = get();
 
-                // Clear any existing interval
                 if (state.intervalId) {
                     clearInterval(state.intervalId);
                 }

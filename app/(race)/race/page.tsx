@@ -244,13 +244,10 @@ export default function QuickRacePage() {
     useEffect(() => {
         initializeRacers('user', 'YOU');
         startNewRace();
-        // eslint-disable-next-line react-hooks/exhaustive-rules
     }, []);
 
     return (
         <div className="min-h-screen flex flex-col items-center p-4 md:p-8 relative z-10">
-
-            {/* HUD Header */}
             <div className="w-full max-w-5xl mb-8 flex justify-between items-end border-b border-[var(--border)] pb-4">
                 <div>
                     <h1 className="text-2xl font-black uppercase tracking-widest text-white flex items-center gap-2">
@@ -282,10 +279,8 @@ export default function QuickRacePage() {
                 )}
             </div>
 
-            {/* Countdown Overlay - Very transparent so text is clearly visible */}
             {preCountdown && (
                 <div className="fixed inset-0 bg-black/10 z-50 pointer-events-none">
-                    {/* Countdown Number - Positioned at top center, above the text area */}
                     <div className="absolute top-32 left-1/2 transform -translate-x-1/2 z-50">
                         <div 
                             className="text-9xl font-black text-[var(--primary)] transition-all duration-300 ease-out"
@@ -302,19 +297,14 @@ export default function QuickRacePage() {
                 </div>
             )}
 
-            {/* Main Race Area */}
             <div className="w-full max-w-4xl relative">
-
-                {/* Racers Track (HUD Style) */}
                 <div className="mb-8 space-y-2">
                     {racers.map(r => (
                         <div key={r.id} className="relative h-12 bg-[var(--bg-card)] border border-[var(--border)] rounded overflow-hidden">
-                            {/* Progress Bar */}
                             <div
                                 className="absolute top-0 left-0 h-full bg-[var(--primary)] opacity-20 transition-all duration-300 ease-linear"
                                 style={{ width: `${r.progress}%` }}
                             />
-                            {/* Racer Info */}
                             <div className="absolute inset-0 flex items-center justify-between px-4">
                                 <span className="font-bold text-white tracking-wider flex items-center gap-2">
                                     {r.nickname}
@@ -322,7 +312,6 @@ export default function QuickRacePage() {
                                 </span>
                                 <span className="font-mono text-[var(--primary)]">{r.wpm} WPM</span>
                             </div>
-                            {/* Leading Edge Indicator */}
                             <div
                                 className="absolute top-0 bottom-0 w-1 bg-[var(--primary)] shadow-[0_0_10px_var(--primary)] transition-all duration-300 ease-linear"
                                 style={{ left: `${r.progress}%` }}
@@ -331,12 +320,10 @@ export default function QuickRacePage() {
                     ))}
                 </div>
 
-                {/* Text Display (Cockpit) */}
                 <div
                     className="relative p-8 md:p-12 bg-black/40 border border-[var(--border)] rounded-lg backdrop-blur-md min-h-[200px] text-2xl md:text-3xl font-mono leading-relaxed break-words shadow-[inset_0_0_50px_rgba(0,0,0,0.5)] z-10"
                     onClick={() => inputRef.current?.focus()}
                 >
-                    {/* Corner Accents */}
                     <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--primary)]" />
                     <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--primary)]" />
                     <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--primary)]" />
@@ -344,7 +331,6 @@ export default function QuickRacePage() {
 
                     {renderText}
 
-                    {/* Hidden Input */}
                     {status !== 'finished' && (
                         <input
                             ref={inputRef}
@@ -356,7 +342,6 @@ export default function QuickRacePage() {
                         />
                     )}
 
-                    {/* Start Prompt */}
                     {status === 'idle' && !preCountdown && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                             <CyberButton onClick={startNewRace} glow>
@@ -366,7 +351,6 @@ export default function QuickRacePage() {
                     )}
                 </div>
 
-                {/* Error Warning */}
                 {errors > 0 && status === 'running' && (
                     <div className="mt-4 flex items-center justify-center text-[var(--error)] animate-pulse font-mono font-bold">
                         <AlertTriangle size={20} className="mr-2" />
@@ -375,7 +359,6 @@ export default function QuickRacePage() {
                 )}
             </div>
 
-            {/* Results Modal */}
             {status === 'finished' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <CyberCard className="max-w-2xl w-full animate-in fade-in zoom-in duration-300 border-[var(--primary)] shadow-[0_0_50px_rgba(0,243,255,0.2)]">

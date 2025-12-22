@@ -16,7 +16,6 @@ export default async function DashboardPage() {
         return <GuestDashboard />;
     }
 
-    // Fetch user stats and recent races
     const [userStats, recentRaces] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.user.id },
@@ -39,10 +38,9 @@ export default async function DashboardPage() {
         bestWpm: Math.round(Number(userStats?.bestWpm) || 0),
         accuracy: Math.round(Number(userStats?.avgAccuracy) || 0),
         avgWpm: Math.round(Number(userStats?.avgWpm) || 0),
-        streak: 0, // Placeholder
+        streak: 0,
     };
 
-    // Format dates on server side to avoid hydration mismatches
     const formatDate = (date: Date) => {
         const d = new Date(date);
         const year = d.getFullYear();

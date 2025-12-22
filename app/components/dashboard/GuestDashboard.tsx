@@ -13,8 +13,6 @@ const GuestDashboard: React.FC = () => {
     return (
         <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-6xl mx-auto space-y-8">
-
-                {/* Welcome / CTA Banner */}
                 <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] p-8 md:p-12 text-center">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50" />
 
@@ -41,13 +39,11 @@ const GuestDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Guest Warning */}
                 <div className="flex items-center justify-center gap-2 text-[var(--text-muted)] text-sm font-mono border border-[var(--border)] p-2 rounded bg-black/20">
                     <AlertCircle size={14} className="text-[var(--secondary)]" />
                     <span>GUEST MODE: DATA NOT PERSISTED PERMANENTLY</span>
                 </div>
 
-                {/* Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <CyberCard title="Races" icon={<Trophy size={24} />}>
                         <p className="text-4xl font-black text-white">{stats.racesPlayed}</p>
@@ -76,7 +72,6 @@ const GuestDashboard: React.FC = () => {
                     </CyberCard>
                 </div>
 
-                {/* Recent Activity */}
                 {stats.recentRaces && stats.recentRaces.length > 0 && (
                     <div className="space-y-4">
                         <h2 className="text-2xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
