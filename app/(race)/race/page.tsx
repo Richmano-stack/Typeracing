@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useCallback } from 'react';
-import { RefreshCw, Zap, Play, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Zap, Play, AlertTriangle, Loader2 } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useGuestStats } from '@/hooks/useGuestStats';
 import { useRouter } from 'next/navigation';
@@ -20,6 +20,7 @@ export default function QuickRacePage() {
     const { stats, saveRace } = useGuestStats();
     const inputRef = useRef<HTMLInputElement>(null);
     const raceIdRef = useRef<string | null>(null);
+    const [isSaving, setIsSaving] = React.useState<boolean>(false);
 
     const {
         text,
@@ -57,6 +58,7 @@ export default function QuickRacePage() {
 
     const startNewRace = () => {
         raceIdRef.current = null;
+        setIsSaving(false);
         const randomIndex = Math.floor(Math.random() * TYPING_TEXTS.length);
         initializeRace(TYPING_TEXTS[randomIndex], randomIndex.toString(), 'race');
         resetRacers();
@@ -170,6 +172,7 @@ export default function QuickRacePage() {
         };
         
         try {
+            setIsSaving(true);
             const response = await fetch('/api/races', {
                 method: 'POST',
                 headers: {
@@ -185,6 +188,8 @@ export default function QuickRacePage() {
             }
         } catch (error) {
             return false;
+        } finally {
+            setIsSaving(false);
         }
     }, [session, status, startTime, endTime, wpm, accuracy, errors, text]);
 
@@ -365,7 +370,14 @@ export default function QuickRacePage() {
                             <h2 className="text-4xl font-black uppercase text-white mb-2" style={{ textShadow: '0 0 20px var(--primary)' }}>
                                 Sequence Complete
                             </h2>
-                            <p className="text-[var(--text-secondary)] font-mono">DATA UPLOADED TO LOCAL STORAGE</p>
+                            <p className="text-[var(--text-secondary)] font-mono">
+                                {isSaving ? 'UPLOADING TO SERVER...' : 'DATA UPLOADED TO LOCAL STORAGE'}
+                            </p>
+                            {isSaving && (
+                                <div className="flex justify-center mt-4">
+                                    <Loader2 className="text-[var(--primary)] animate-spin" size={24} />
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-3 gap-4 mb-8">
@@ -400,12 +412,14 @@ export default function QuickRacePage() {
                             <CyberButton 
                                 onClick={startNewRace}
                                 glow
+                                disabled={isSaving}
                             >
                                 <RefreshCw size={18} /> RESTART SEQUENCE
                             </CyberButton>
                             <CyberButton 
                                 variant="secondary" 
                                 onClick={() => router.push('/dashboard')}
+                                disabled={isSaving}
                             >
                                 EXIT TO HUB
                             </CyberButton>

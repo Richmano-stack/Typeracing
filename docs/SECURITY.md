@@ -141,7 +141,7 @@ if (!usernameRegex.test(username)) {
 
 #### Option 1: Upstash Rate Limit (Recommended)
 ```bash
-npm install @upstash/ratelimit @upstash/redis
+pnpm add @upstash/ratelimit @upstash/redis
 ```
 
 ```typescript
@@ -359,7 +359,7 @@ events: {
 - [ ] OAuth scopes are minimal
 - [ ] Logging is implemented
 - [ ] Error messages don't leak sensitive info
-- [ ] Dependencies are up to date (`npm audit`)
+- [ ] Dependencies are up to date (`pnpm audit` or `yarn audit`)
 
 ### Regular Maintenance
 - [ ] Rotate secrets every 90 days

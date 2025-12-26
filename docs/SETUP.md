@@ -60,7 +60,9 @@ npx prisma generate
 ### 3.1 Check for TypeScript errors
 
 ```bash
-npm run build
+pnpm build
+# or
+yarn build
 ```
 
 All TypeScript errors related to Prisma should be resolved after running `npx prisma generate`.
@@ -68,7 +70,9 @@ All TypeScript errors related to Prisma should be resolved after running `npx pr
 ### 3.2 Start development server
 
 ```bash
-npm run dev
+pnpm dev
+# or
+yarn dev
 ```
 
 ## Step 4: Test Authentication

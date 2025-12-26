@@ -56,9 +56,9 @@ Production deployment, scaling, monitoring, and maintenance strategies.
 1. **Vercel Configuration**
    ```json
    {
-     "buildCommand": "npm run build",
-     "devCommand": "npm run dev",
-     "installCommand": "npm install",
+     "buildCommand": "pnpm build",
+     "devCommand": "pnpm dev",
+     "installCommand": "pnpm install",
      "framework": "nextjs"
    }
    ```

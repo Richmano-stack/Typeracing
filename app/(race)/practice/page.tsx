@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useCallback } from 'react';
-import { RefreshCw, Trophy, Zap, AlertTriangle, X } from 'lucide-react';
+import { RefreshCw, Trophy, Zap, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useRaceStore } from '@/lib/useRaceStore';
 import { useTimerStore } from '@/lib/useTimerStore';
@@ -20,6 +20,7 @@ const PracticePage: React.FC = () => {
     const { stats, saveRace } = useGuestStats();
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [bestWpm, setBestWpm] = React.useState<number | null>(null);
+    const [isSaving, setIsSaving] = React.useState<boolean>(false);
     const raceIdRef = useRef<string | null>(null);
 
     // Race store
@@ -104,6 +105,7 @@ const PracticePage: React.FC = () => {
         };
         
         try {
+            setIsSaving(true);
             const response = await fetch('/api/races', {
                 method: 'POST',
                 headers: {
@@ -119,6 +121,8 @@ const PracticePage: React.FC = () => {
             }
         } catch (error) {
             return false;
+        } finally {
+            setIsSaving(false);
         }
     }, [session, status, startTime, endTime, wpm, accuracy, errors, text, timer]);
 
@@ -167,6 +171,7 @@ const PracticePage: React.FC = () => {
 
     const handleReset = () => {
         raceIdRef.current = null;
+        setIsSaving(false);
         const newText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(newText, '0', 'practice');
         resetTimer();
@@ -320,7 +325,14 @@ const PracticePage: React.FC = () => {
                             <h2 className="text-4xl font-black uppercase text-white mb-2" style={{ textShadow: '0 0 20px var(--primary)' }}>
                                 {bestWpm !== null && wpm > bestWpm ? 'NEW RECORD!' : 'Practice Complete'}
                             </h2>
-                            <p className="text-[var(--text-secondary)] font-mono">SESSION TERMINATED</p>
+                            <p className="text-[var(--text-secondary)] font-mono">
+                                {isSaving ? 'UPLOADING TO SERVER...' : 'SESSION TERMINATED'}
+                            </p>
+                            {isSaving && (
+                                <div className="flex justify-center mt-4">
+                                    <Loader2 className="text-[var(--primary)] animate-spin" size={24} />
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-3 gap-4 mb-8">
@@ -352,12 +364,13 @@ const PracticePage: React.FC = () => {
                         )}
 
                         <div className="flex justify-center gap-4">
-                            <CyberButton onClick={handleReset} glow>
+                            <CyberButton onClick={handleReset} glow disabled={isSaving}>
                                 <RefreshCw size={18} /> PRACTICE AGAIN
                             </CyberButton>
                             <CyberButton 
                                 variant="secondary" 
                                 onClick={() => router.push('/dashboard')}
+                                disabled={isSaving}
                             >
                                 <X size={18} /> EXIT
                             </CyberButton>
