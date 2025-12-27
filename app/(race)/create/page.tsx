@@ -1,18 +1,66 @@
 "use client"
 
 import React, { useState } from 'react';
-import { Share2, Lock, Copy, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { Share2, Lock, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
 import CyberCard from '@/components/ui/CyberCard';
 import CyberButton from '@/components/ui/CyberButton';
 
 const CreateRacePage: React.FC = () => {
+    const router = useRouter();
+    const { data: session } = useSession();
     const [inviteLink, setInviteLink] = useState<string | null>(null);
     const [isCopied, setIsCopied] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [roomCode, setRoomCode] = useState<string | null>(null);
 
-    const generateLink = () => {
-        const uniqueId = Math.random().toString(36).substring(2, 10);
-        setInviteLink(`${window.location.origin}/race/invite/${uniqueId}`);
+    const generateLink = async () => {
+        setIsCreating(true);
+        setError(null);
         setIsCopied(false);
+
+        try {
+            // For guests, prompt for name
+            let guestName: string | undefined;
+            if (!session?.user) {
+                guestName = prompt('Enter your name:') || 'Guest';
+                if (!guestName || guestName.trim() === '') {
+                    guestName = 'Guest';
+                }
+            }
+
+            const response = await fetch('/api/rooms', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    maxPlayers: 10,
+                    guestName: guestName,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Failed to create room');
+            }
+
+            const data = await response.json();
+            setInviteLink(data.inviteLink);
+            setRoomCode(data.roomCode);
+            setIsCreating(false);
+
+            // Redirect to lobby after a short delay
+            setTimeout(() => {
+                router.push(`/race/room/${data.roomCode}`);
+            }, 2000);
+        } catch (err) {
+            console.error('Error creating room:', err);
+            setError(err instanceof Error ? err.message : 'Failed to create room');
+            setIsCreating(false);
+        }
     };
 
     const copyLink = () => {
@@ -57,15 +105,32 @@ const CreateRacePage: React.FC = () => {
                                     </p>
                                 </div>
 
+                                {error && (
+                                    <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
+                                        <AlertCircle size={18} />
+                                        <span className="text-sm font-mono">{error}</span>
+                                    </div>
+                                )}
+
                                 <CyberButton
                                     onClick={generateLink}
                                     variant="secondary"
                                     size="lg"
                                     glow
+                                    disabled={isCreating}
                                     className="w-full text-xl py-6"
                                 >
-                                    <Share2 size={24} />
-                                    <span>Generate Invite Link</span>
+                                    {isCreating ? (
+                                        <>
+                                            <Loader2 size={24} className="animate-spin" />
+                                            <span>Creating Room...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Share2 size={24} />
+                                            <span>Generate Invite Link</span>
+                                        </>
+                                    )}
                                 </CyberButton>
 
                                 <div className="mt-8 p-4 bg-[var(--bg-primary-subtle)] border border-[var(--border)] rounded-lg">
@@ -115,23 +180,21 @@ const CreateRacePage: React.FC = () => {
                                     </button>
                                 </div>
 
+                                {roomCode && (
+                                    <div className="p-4 bg-[var(--bg-primary-subtle)] border border-[var(--border)] rounded-lg">
+                                        <p className="text-sm text-[var(--text-secondary)] font-mono text-center mb-2">
+                                            Room Code: <span className="text-[var(--accent)] font-bold">{roomCode}</span>
+                                        </p>
+                                        <p className="text-xs text-[var(--text-muted)] font-mono text-center">
+                                            Redirecting to lobby...
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="p-4 bg-[var(--bg-primary-subtle)] border border-[var(--border)] rounded-lg">
                                     <p className="text-sm text-[var(--text-secondary)] font-mono text-center">
                                         Send this link to your friends to start the private race session
                                     </p>
-                                </div>
-
-                                <div className="pt-4">
-                                    <CyberButton
-                                        onClick={() => {
-                                            setInviteLink(null);
-                                            setIsCopied(false);
-                                        }}
-                                        variant="primary"
-                                        className="w-full"
-                                    >
-                                        Generate New Link
-                                    </CyberButton>
                                 </div>
                             </div>
                         )}

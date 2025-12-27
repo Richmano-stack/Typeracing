@@ -31,6 +31,10 @@ model User {
 
   // Relation: Liste de toutes les courses effectuées par cet utilisateur
   races Race[] @relation("UserRaces")
+  
+  // Relations for private lobbies
+  hostedRooms RaceRoom[] @relation("HostedRooms")
+  raceParticipants RaceParticipant[] @relation("RaceParticipants")
 
   @@map("users") // Assure que le nom de la table en DB est 'users'
 }
@@ -62,4 +66,79 @@ model Race {
 
   @@index([userId]) // Crée un index sur userId pour accélérer la recherche des courses par utilisateur
   @@map("races") // Assure que le nom de la table en DB est 'races'
+}
+
+// =========================================================
+// Modèle 3: RaceRoom (Private Lobby Rooms)
+// Correspond à la table 'race_rooms'
+// =========================================================
+enum RoomStatus {
+  WAITING      // Waiting for players
+  STARTING     // Countdown in progress
+  IN_PROGRESS  // Race is running
+  FINISHED     // Race completed
+}
+
+model RaceRoom {
+  id          String   @id @default(uuid())
+  roomCode    String   @unique // Short, shareable code (e.g., "ABC123")
+  hostId      String?  // User who created the room (null for guests)
+  host        User?    @relation("HostedRooms", fields: [hostId], references: [id])
+  
+  // Settings
+  maxPlayers  Int      @default(10)
+  textId      String?  // Optional: specific text, null = random
+  isPrivate   Boolean  @default(true)
+  
+  // Status
+  status      RoomStatus @default(WAITING) // WAITING, STARTING, IN_PROGRESS, FINISHED
+  currentText String?    // Text being used for current race
+  
+  // Timing
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  
+  // Relations
+  participants RaceParticipant[]
+  
+  @@index([roomCode])
+  @@index([hostId])
+  @@map("race_rooms")
+}
+
+// =========================================================
+// Modèle 4: RaceParticipant (Room Participants)
+// Correspond à la table 'race_participants'
+// =========================================================
+model RaceParticipant {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        RaceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId      String?  // null for guests
+  user        User?    @relation("RaceParticipants", fields: [userId], references: [id])
+  
+  // Guest info (if not logged in)
+  guestName   String?
+  
+  // Race progress
+  progress    Float    @default(0) // 0-100
+  wpm         Decimal  @default(0) @db.Decimal(5, 2)
+  accuracy    Decimal  @default(0) @db.Decimal(5, 2)
+  errors      Int      @default(0)
+  completedAt DateTime?
+  
+  // Status
+  isReady     Boolean  @default(false)
+  isFinished  Boolean  @default(false)
+  
+  // Timing
+  joinedAt    DateTime @default(now())
+  startedAt   DateTime?
+  
+  // Note: Uniqueness of [roomId, userId] is enforced in application logic
+  // since userId can be null for guests (PostgreSQL allows multiple nulls in unique constraints)
+  @@index([roomId])
+  @@index([userId])
+  @@map("race_participants")
 }
