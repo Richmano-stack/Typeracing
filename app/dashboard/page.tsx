@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import GuestDashboard from '@/components/dashboard/GuestDashboard';
 import UserDashboard from '@/components/dashboard/UserDashboard';
@@ -10,7 +10,9 @@ export const metadata = {
 };
 
 export default async function DashboardPage() {
-    const session = await getServerSession(authOptions);
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
 
     if (!session || !session.user) {
         return <GuestDashboard />;
@@ -22,7 +24,6 @@ export default async function DashboardPage() {
             select: {
                 totalRaces: true,
                 bestWpm: true,
-                avgAccuracy: true,
                 avgWpm: true,
             },
         }),
@@ -36,7 +37,7 @@ export default async function DashboardPage() {
     const stats = {
         racesPlayed: userStats?.totalRaces || 0,
         bestWpm: Math.round(Number(userStats?.bestWpm) || 0),
-        accuracy: Math.round(Number(userStats?.avgAccuracy) || 0),
+        accuracy: 100, // Placeholder
         avgWpm: Math.round(Number(userStats?.avgWpm) || 0),
         streak: 0,
     };

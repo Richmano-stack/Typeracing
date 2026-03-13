@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Github, Chrome, Mail, Lock } from 'lucide-react';
@@ -28,13 +28,13 @@ export default function LoginForm() {
         setError(null);
 
         try {
-            const result = await signIn('credentials', {
-                redirect: false,
+            const { data, error: loginError } = await authClient.signIn.email({
                 email: formData.email,
                 password: formData.password,
+                callbackURL: "/dashboard",
             });
 
-            if (result?.error) {
+            if (loginError) {
                 setError('Invalid email or password');
             } else {
                 router.push('/dashboard');
@@ -47,10 +47,13 @@ export default function LoginForm() {
         }
     };
 
-    const handleSocialLogin = async (provider: string) => {
+    const handleSocialLogin = async (provider: any) => {
         setIsLoading(provider);
         try {
-            await signIn(provider, { callbackUrl: '/dashboard' });
+            await authClient.signIn.social({
+                provider,
+                callbackURL: '/dashboard'
+            });
         } catch (error) {
             console.error('Login error:', error);
             setIsLoading(null);

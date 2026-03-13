@@ -1,144 +1,97 @@
-// Specify Postgres as datasource
+// This is your merged BetterAuth + Typeracing Schema
+
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// Generate Prisma client
 generator client {
   provider = "prisma-client-js"
 }
 
-// =========================================================
-// Modèle 1: User (Statistiques Agrégées et Infos Utilisateur)
-// Correspond à la table 'users'
-// =========================================================
+// --- BETTERAUTH CORE TABLES (EXTENDED) ---
+
 model User {
-  // Identification
-  id       String    @id @default(uuid()) // Utilise UUID pour la clé primaire
-  username String  @unique @db.VarChar(50)
-  email    String  @unique @db.VarChar(100)
-  hashedPassword String
-  
-  // Dates
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Game-Specific Stats (Your Extended Fields)
+  total_races   Int       @default(0)
+  average_wpm   Float     @default(0.0)
+  best_wpm      Float     @default(0.0)
+
+  // Relationships
+  sessions      Session[]
+  accounts      Account[]
+  raceResults   RaceResult[]
+  achievements  UserAchievement[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  expiresAt DateTime
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Statistiques Agrégées (Dénormalisées pour la performance du profil)
-  totalRaces   Int     @default(0)
-  avgWpm       Decimal   @default(0.00) @db.Decimal(5, 2)
-  bestWpm      Decimal   @default(0.00) @db.Decimal(5, 2)
-  avgAccuracy  Decimal   @default(0.00) @db.Decimal(5, 2)
-
-  // Relation: Liste de toutes les courses effectuées par cet utilisateur
-  races Race[] @relation("UserRaces")
-  
-  // Relations for private lobbies
-  hostedRooms RaceRoom[] @relation("HostedRooms")
-  raceParticipants RaceParticipant[] @relation("RaceParticipants")
-
-  @@map("users") // Assure que le nom de la table en DB est 'users'
+  @@map("session")
 }
 
-// =========================================================
-// Modèle 2: Race (Détails de Chaque Course)
-// Correspond à la table 'races'
-// =========================================================
-model Race {
-  id             String    @id @default(uuid())
-  
-  // Métriques de Performance
-  wpm            Decimal     @db.Decimal(5, 2)
-  accuracy       Decimal     @db.Decimal(5, 2)
-  timeTakenMs    Int       // Temps en millisecondes
-  errors         Int
-  textHash       String    @db.VarChar(64) // Hash pour identifier le texte de la course
-  raceType       String    @default("quick") @db.VarChar(20) // Type de course: quick, solo, private
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   // Required for emailPassword
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  // Métriques détaillées (JSONB) - Pour les données par seconde/frappe
-  detailedMetrics Json? // Utilisez 'Json?' si c'est optionnel ou 'Json' si toujours présent
-
-  // Date de fin de la course
-  completedAt    DateTime @default(now())
-
-  // Relation: Utilisateur qui a effectué la course
-  userId         String
-  user           User     @relation("UserRaces", fields: [userId], references: [id])
-
-  @@index([userId]) // Crée un index sur userId pour accélérer la recherche des courses par utilisateur
-  @@map("races") // Assure que le nom de la table en DB est 'races'
+  @@map("account")
 }
 
-// =========================================================
-// Modèle 3: RaceRoom (Private Lobby Rooms)
-// Correspond à la table 'race_rooms'
-// =========================================================
-enum RoomStatus {
-  WAITING      // Waiting for players
-  STARTING     // Countdown in progress
-  IN_PROGRESS  // Race is running
-  FINISHED     // Race completed
+// --- GAME DOMAIN TABLES ---
+
+model RaceResult {
+  id               String       @id @default(uuid())
+  userId           String?      // Nullable for guests
+  user             User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode             String       // 'solo' or 'multiplayer'
+  wpm              Float
+  accuracy         Float
+  duration_seconds Int
+  text_id          String
+  textPassage      TextPassage  @relation(fields: [text_id], references: [id])
+  completedAt      DateTime     @default(now())
+
+  @@map("race_results")
 }
 
-model RaceRoom {
-  id          String   @id @default(uuid())
-  roomCode    String   @unique // Short, shareable code (e.g., "ABC123")
-  hostId      String?  // User who created the room (null for guests)
-  host        User?    @relation("HostedRooms", fields: [hostId], references: [id])
-  
-  // Settings
-  maxPlayers  Int      @default(10)
-  textId      String?  // Optional: specific text, null = random
-  isPrivate   Boolean  @default(true)
-  
-  // Status
-  status      RoomStatus @default(WAITING) // WAITING, STARTING, IN_PROGRESS, FINISHED
-  currentText String?    // Text being used for current race
-  
-  // Timing
-  createdAt   DateTime @default(now())
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  
-  // Relations
-  participants RaceParticipant[]
-  
-  @@index([roomCode])
-  @@index([hostId])
-  @@map("race_rooms")
+model TextPassage {
+  id          String       @id @default(uuid())
+  content     String       @db.Text
+  source      String?
+  difficulty  String
+  length      Int
+  raceResults RaceResult[]
+
+  @@map("text_passages")
 }
 
-// =========================================================
-// Modèle 4: RaceParticipant (Room Participants)
-// Correspond à la table 'race_participants'
-// =========================================================
-model RaceParticipant {
-  id          String   @id @default(uuid())
-  roomId      String
-  room        RaceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  userId      String?  // null for guests
-  user        User?    @relation("RaceParticipants", fields: [userId], references: [id])
-  
-  // Guest info (if not logged in)
-  guestName   String?
-  
-  // Race progress
-  progress    Float    @default(0) // 0-100
-  wpm         Decimal  @default(0) @db.Decimal(5, 2)
-  accuracy    Decimal  @default(0) @db.Decimal(5, 2)
-  errors      Int      @default(0)
-  completedAt DateTime?
-  
-  // Status
-  isReady     Boolean  @default(false)
-  isFinished  Boolean  @default(false)
-  
-  // Timing
-  joinedAt    DateTime @default(now())
-  startedAt   DateTime?
-  
-  // Note: Uniqueness of [roomId, userId] is enforced in application logic
-  // since userId can be null for guests (PostgreSQL allows multiple nulls in unique constraints)
-  @@index([roomId])
-  @@index([userId])
-  @@map("race_participants")
-}

@@ -1,26 +1,25 @@
 "use client";
 
 import React, { useState } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Mail, Lock } from 'lucide-react';
 import CyberCard from '@/components/ui/CyberCard';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberInput from '@/components/ui/CyberInput';
+import { authClient } from '@/lib/auth-client';
 
 export default function RegisterForm() {
-    const router = useRouter();
+    const [formData, setFormData] = useState({
+        name: "",
+        email: "",
+        password: "",
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [formData, setFormData] = useState({
-        username: '',
-        email: '',
-        password: '',
-    });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -28,32 +27,21 @@ export default function RegisterForm() {
         setIsLoading(true);
         setError(null);
 
-        try {
-            const response = await fetch('/api/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Registration failed');
-            }
-
-            // Login immediately after registration
-            await signIn('credentials', {
-                redirect: false,
-                email: formData.email,
-                password: formData.password,
-            });
-
-            router.push('/dashboard');
-            router.refresh();
-        } catch (error: any) {
-            setError(error.message || 'Something went wrong');
-        } finally {
-            setIsLoading(false);
-        }
+        await authClient.signUp.email({
+            email: formData.email,
+            password: formData.password,
+            name: formData.name,
+            callbackURL: "/dashboard",
+        }, {
+            onRequest: () => setIsLoading(true),
+            onSuccess: () => {
+                setIsLoading(false);
+            },
+            onError: (ctx) => {
+                setError(ctx.error.message);
+                setIsLoading(false);
+            },
+        });
     };
 
     return (
@@ -65,16 +53,16 @@ export default function RegisterForm() {
                     </div>
                 )}
 
-                <CyberInput
+                {/*                 <CyberInput
                     label="Username"
-                    name="username"
+                    name="name"
                     type="text"
                     placeholder="Choose a username"
-                    value={formData.username}
+                    value={formData.name}
                     onChange={handleChange}
                     icon={<User size={16} />}
                     required
-                />
+                /> */}
 
                 <CyberInput
                     label="Email"
