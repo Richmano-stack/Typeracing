@@ -2,7 +2,6 @@
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -29,7 +28,6 @@ model User {
   sessions      Session[]
   accounts      Account[]
   raceResults   RaceResult[]
-  achievements  UserAchievement[]
 
   @@map("user")
 }

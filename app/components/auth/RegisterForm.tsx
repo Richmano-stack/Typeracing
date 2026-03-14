@@ -53,7 +53,7 @@ export default function RegisterForm() {
                     </div>
                 )}
 
-                {/*                 <CyberInput
+                <CyberInput
                     label="Username"
                     name="name"
                     type="text"
@@ -62,7 +62,7 @@ export default function RegisterForm() {
                     onChange={handleChange}
                     icon={<User size={16} />}
                     required
-                /> */}
+                />
 
                 <CyberInput
                     label="Email"

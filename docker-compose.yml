@@ -5,11 +5,11 @@ services:
     image: postgres:16
     container_name: typeracer-postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_USER: typeracer
-      POSTGRES_PASSWORD: motsDepass
-      POSTGRES_DB: typeracer_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

@@ -4,12 +4,10 @@
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "prisma generate && next build",
-    "start": "NODE_ENV=production tsx server.ts",
-    "lint": "eslint",
-    "seed": "tsx prisma/seed.ts",
-    "postinstall": "node scripts/postinstall.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -32,8 +30,6 @@
     "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0",
     "zustand": "^5.0.9"
   },
