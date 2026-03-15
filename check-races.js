@@ -15,7 +15,7 @@ async function main() {
 
     const user = await prisma.user.findUnique({
         where: { email },
-        include: { races: true }
+        include: { raceResults: true }
     });
 
     if (!user) {
@@ -23,8 +23,8 @@ async function main() {
         return;
     }
 
-    console.log(`User ${user.username} has ${user.races.length} races.`);
-    user.races.forEach(race => {
+    console.log(`User ${user.username || user.email} has ${user.raceResults.length} races.`);
+    user.raceResults.forEach(race => {
         console.log(`- Race ID: ${race.id}, WPM: ${race.wpm}, Date: ${race.completedAt}`);
     });
 }

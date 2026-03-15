@@ -22,12 +22,12 @@ export default async function DashboardPage() {
         prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
-                totalRaces: true,
-                bestWpm: true,
-                avgWpm: true,
+                total_races: true,
+                best_wpm: true,
+                average_wpm: true,
             },
         }),
-        prisma.race.findMany({
+        prisma.raceResult.findMany({
             where: { userId: session.user.id },
             orderBy: { completedAt: 'desc' },
             take: 10,
@@ -35,10 +35,10 @@ export default async function DashboardPage() {
     ]);
 
     const stats = {
-        racesPlayed: userStats?.totalRaces || 0,
-        bestWpm: Math.round(Number(userStats?.bestWpm) || 0),
+        racesPlayed: userStats?.total_races || 0,
+        bestWpm: Math.round(Number(userStats?.best_wpm) || 0),
         accuracy: 100, // Placeholder
-        avgWpm: Math.round(Number(userStats?.avgWpm) || 0),
+        avgWpm: Math.round(Number(userStats?.average_wpm) || 0),
         streak: 0,
     };
 
@@ -56,8 +56,8 @@ export default async function DashboardPage() {
         id: race.id,
         wpm: Math.round(Number(race.wpm)),
         accuracy: Math.round(Number(race.accuracy)),
-        errors: race.errors,
-        raceType: race.raceType || 'quick',
+        errors: 0, // Not present in schema
+        raceType: race.mode || 'solo',
         completedAt: race.completedAt,
         formattedDate: formatDate(race.completedAt),
     }));

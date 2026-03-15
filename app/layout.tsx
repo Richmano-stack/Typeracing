@@ -5,7 +5,7 @@ import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { GuestStatsProvider } from "./hooks/useGuestStats";
-import { SessionProvider } from "./components/providers/SessionProvider";
+
 
 
 const geistSans = Geist({
@@ -34,7 +34,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <SessionProvider>
         <GuestStatsProvider>
           <Header />
           <main className="pt-16 min-h-screen">{/* Décalage pour le header fixe */}
@@ -42,7 +41,6 @@ export default function RootLayout({
           </main>
           <Footer />
         </GuestStatsProvider>
-        </SessionProvider>
       </body>
     </html>
   );
