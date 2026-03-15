@@ -4,54 +4,39 @@
 
 Copy these to your `.env` file and fill in the values.
 
-### Database (Supabase Postgres)
+### Database (PostgreSQL)
 ```bash
-# Connection pooling URL (for Prisma queries)
-DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+# Connection URL for the database
+DATABASE_URL="postgresql://[USER]:[PASSWORD]@localhost:5432/[DB_NAME]?schema=public"
 
-# Direct connection URL (for migrations)
-DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+# Postgres Configuration (for Docker)
+POSTGRES_USER="your-username-here"
+POSTGRES_PASSWORD="your-password-here"
+POSTGRES_DB="your-db-name-here"
 ```
 
-### Auth.js (NextAuth)
+### Better Auth
 ```bash
 # Your application URL
-NEXTAUTH_URL="http://localhost:3000"
+BETTER_AUTH_URL="http://localhost:3000"
 
-# Secret for JWT signing (generate with: openssl rand -base64 32)
-NEXTAUTH_SECRET="your-super-secret-key-here"
+# Secret for authentication (generate with a random string)
+BETTER_AUTH_SECRET="your-super-secret-key-here"
 ```
 
-### OAuth Providers
+## Optional Variables (OAuth)
 
-#### GitHub
+### GitHub
 1. Create OAuth app at: https://github.com/settings/developers
-2. Set Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
-3. Add credentials:
+2. Add credentials if using GitHub provider:
 ```bash
-GITHUB_ID="your-github-oauth-app-client-id"
-GITHUB_SECRET="your-github-oauth-app-client-secret"
-```
-
-#### Google
-1. Create credentials at: https://console.cloud.google.com/apis/credentials
-2. Set Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-3. Add credentials:
-```bash
-GOOGLE_ID="your-google-oauth-client-id"
-GOOGLE_SECRET="your-google-oauth-client-secret"
-```
-
-## Optional Variables
-
-```bash
-# Base URL for email verification links
-NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+# GITHUB_ID="your-github-oauth-app-client-id"
+# GITHUB_SECRET="your-github-oauth-app-client-secret"
 ```
 
 ## Security Notes
 
 - **Never commit `.env` to git** - it's already in `.gitignore`
-- Generate `NEXTAUTH_SECRET` with: `openssl rand -base64 32`
+- Keep your `BETTER_AUTH_SECRET` secure and unique for each environment
 - Use different secrets for development and production
 - Rotate secrets regularly in production
