@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Terminal, LogOut, User, ChevronDown } from 'lucide-react';
-import { signOut } from 'next-auth/react';
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 import Image from 'next/image';
 
 interface HeaderAuthenticatedProps {
@@ -16,7 +17,9 @@ interface HeaderAuthenticatedProps {
 
 const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -30,6 +33,23 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    const handleLogout = async () => {
+        await authClient.signOut({
+            fetchOptions: {
+                onSuccess: () => {
+                    window.location.href="/"; // Redirect after successful logout
+                },
+                onRequest: () => {
+                    setIsPending(true);
+                },
+                onError: (ctx) => {
+                    setIsPending(false);
+                    console.error("Logout failed:", ctx.error.message);
+                }
+            },
+        });
+    };
 
     return (
         <header
@@ -69,10 +89,11 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-lg transition-colors"
+                        disabled={isPending}
                     >
                         <div className="flex flex-col items-end hidden sm:flex">
                             <span className="text-sm font-bold text-white">{user.name || user.email?.split('@')[0] || 'Racer'}</span>
-                            <span className="text-xs text-[var(--text-secondary)]">Online</span>
+                            <span className="text-xs text-[var(--text-secondary)]">{isPending ? 'Logging out...' : 'Online'}</span>
                         </div>
 
                         <div className="relative w-10 h-10 rounded-full overflow-hidden border border-[var(--border)] bg-[var(--card-bg)]">
@@ -110,11 +131,12 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                                     Profile
                                 </Link>
                                 <button
-                                    onClick={() => signOut({ callbackUrl: '/' })}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors"
+                                    onClick={handleLogout}
+                                    disabled={isPending}
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors disabled:opacity-50"
                                 >
                                     <LogOut size={16} />
-                                    Logout
+                                    {isPending ? 'Logging out...' : 'Logout'}
                                 </button>
                             </div>
                         </div>
