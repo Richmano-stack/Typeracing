@@ -7,13 +7,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "dotenv -e .env.test -- vitest",
+    "pretest": "dotenv -e .env.test -- npx prisma db push --force-reset"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
     "@better-fetch/fetch": "^1.1.21",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
@@ -27,7 +28,6 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.553.0",
     "next": "^16.0.7",
-    "next-auth": "^4.24.13",
     "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -41,12 +41,17 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react-swc": "^4.3.0",
+    "@vitest/ui": "^4.1.0",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "jsdom": "^29.0.0",
     "prisma": "^7.2.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "undici": "^7.24.4",
+    "vitest": "^4.1.0"
   }
 }
