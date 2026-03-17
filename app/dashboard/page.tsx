@@ -1,8 +1,8 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import GuestDashboard from '@/components/dashboard/GuestDashboard';
 import UserDashboard from '@/components/dashboard/UserDashboard';
+import { redirect } from "next/navigation";
 
 export const metadata = {
     title: 'Dashboard | TypeRace',
@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     });
 
     if (!session || !session.user) {
-        return <GuestDashboard />;
+        redirect("/");
     }
 
     const [userStats, recentRaces] = await Promise.all([
