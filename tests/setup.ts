@@ -1,16 +1,4 @@
-import { beforeAll, beforeEach, afterAll } from 'vitest';
-import { prisma } from '@/lib/prisma';
+import { config } from "dotenv";
 
-beforeAll(async () => {
-    await prisma.$connect();
-});
-
-beforeEach(async () => {
-    await prisma.session.deleteMany();
-    await prisma.account.deleteMany();
-    await prisma.user.deleteMany();
-});
-
-afterAll(async () => {
-    await prisma.$disconnect();
-});
+// Load test environment variables before Prisma initialises
+config({ path: ".env.test", override: true });
