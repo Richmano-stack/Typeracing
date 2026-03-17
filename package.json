@@ -9,12 +9,13 @@
     "start": "next start",
     "lint": "next lint",
     "test": "dotenv -e .env.test -- prisma db push --accept-data-loss && vitest run"
+
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
+    "@better-fetch/fetch": "^1.1.21",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
