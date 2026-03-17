@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Trophy, Zap, Target, Flame, Play, Swords, Keyboard } from 'lucide-react';
 import CyberCard from '@/components/ui/CyberCard';
 import CyberButton from '@/components/ui/CyberButton';
-import { User } from 'next-auth';
+import { User } from '@prisma/client';
 
 interface UserDashboardProps {
     user: User & {
