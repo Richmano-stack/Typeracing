@@ -9,4 +9,23 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
     },
+    user: {
+        additionalFields: {
+            total_races: {
+                type: "number",
+                defaultValue: 0,
+                fieldName: "total_races",
+            },
+            average_wpm: {
+                type: "number",
+                defaultValue: 0,
+                fieldName: "average_wpm",
+            },
+            best_wpm: {
+                type: "number",
+                defaultValue: 0,
+                fieldName: "best_wpm",
+            },
+        },
+    },
 });
