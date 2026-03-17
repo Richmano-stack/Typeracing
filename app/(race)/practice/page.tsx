@@ -6,7 +6,7 @@ import { RefreshCw, Trophy, Zap, AlertTriangle, X, Loader2 } from 'lucide-react'
 import { TYPING_TEXTS } from '@/lib/texts';
 import { useRaceStore } from '@/lib/useRaceStore';
 import { useTimerStore } from '@/lib/useTimerStore';
-import { useSession } from 'next-auth/react';
+import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import { useGuestStats } from '@/hooks/useGuestStats';
 import CyberButton from '@/components/ui/CyberButton';
@@ -16,14 +16,14 @@ const MAX_ERRORS = 10;
 
 const PracticePage: React.FC = () => {
     const router = useRouter();
-    const { data: session } = useSession();
+    const { data: session } = authClient.useSession();
     const { stats, saveRace } = useGuestStats();
     const inputRef = React.useRef<HTMLInputElement>(null);
     const [bestWpm, setBestWpm] = React.useState<number | null>(null);
     const [isSaving, setIsSaving] = React.useState<boolean>(false);
     const raceIdRef = useRef<string | null>(null);
 
-    // Race store
+
     const {
         text,
         userInput,
@@ -39,7 +39,7 @@ const PracticePage: React.FC = () => {
         resetRace,
     } = useRaceStore();
 
-    // Timer store
+
     const {
         elapsed: timer,
         startTimer,
@@ -47,7 +47,7 @@ const PracticePage: React.FC = () => {
         tick,
     } = useTimerStore();
 
-    // Load best WPM from localStorage on mount
+
     useEffect(() => {
         const randomText = TYPING_TEXTS[Math.floor(Math.random() * TYPING_TEXTS.length)];
         initializeRace(randomText, '0', 'practice');
@@ -61,16 +61,16 @@ const PracticePage: React.FC = () => {
         if (!session?.user) {
             return false;
         }
-        
+
         if (status !== 'finished') {
             return false;
         }
-        
+
         const raceId = raceIdRef.current;
         if (!raceId) {
             return false;
         }
-        
+
         const capturedStartTime = startTime;
         const capturedEndTime = endTime;
         const capturedWpm = wpm;
@@ -78,13 +78,13 @@ const PracticePage: React.FC = () => {
         const capturedErrors = errors;
         const capturedText = text;
         const capturedTimer = timer;
-        
+
         if (!capturedStartTime || !capturedText || capturedText.length === 0) {
             return false;
         }
-        
+
         const textHash = capturedText.substring(0, 20).replace(/\s+/g, "_");
-        
+
         let timeTakenMs: number;
         if (capturedStartTime && capturedEndTime) {
             timeTakenMs = capturedEndTime - capturedStartTime;
@@ -93,7 +93,7 @@ const PracticePage: React.FC = () => {
         } else {
             timeTakenMs = capturedTimer * 1000;
         }
-        
+
         const payload = {
             wpm: capturedWpm,
             accuracy: capturedAccuracy,
@@ -103,7 +103,7 @@ const PracticePage: React.FC = () => {
             raceId: raceId,
             raceType: 'solo',
         };
-        
+
         try {
             setIsSaving(true);
             const response = await fetch('/api/races', {
@@ -113,7 +113,7 @@ const PracticePage: React.FC = () => {
                 },
                 body: JSON.stringify(payload),
             });
-            
+
             if (response.ok) {
                 return true;
             } else {
@@ -126,9 +126,9 @@ const PracticePage: React.FC = () => {
         }
     }, [session, status, startTime, endTime, wpm, accuracy, errors, text, timer]);
 
-    // Save best WPM and race data when race finishes
+
     const hasSavedRef = useRef<boolean>(false);
-    
+
     useEffect(() => {
         if (status !== 'finished' || !startTime || !text || hasSavedRef.current) {
             if (status !== 'finished') {
@@ -136,38 +136,38 @@ const PracticePage: React.FC = () => {
             }
             return;
         }
-        
+
         hasSavedRef.current = true;
-      
+
         // Save locally (guest stats)
         saveRace(wpm, accuracy, 'solo', errors);
-      
+
         // Save best WPM
         if (bestWpm === null || wpm > bestWpm) {
             setBestWpm(wpm);
             localStorage.setItem('bestWpm', wpm.toString());
         }
-      
+
         // Save to server (logged-in users only)
         if (session?.user) {
             saveRaceToServer();
         }
     }, [status, startTime, text, wpm, accuracy, errors, session, saveRace, saveRaceToServer, bestWpm]);
-      
-    
-/*     useEffect(() => {
-        if (status !== 'finished') return;
-      
-        const raceKey = `${startTime}-${endTime}`;
-        if (savedRaceRef.current === raceKey) return;
-      
-        savedRaceRef.current = raceKey;
-      
-        saveRace(wpm, accuracy, 'solo', errors);
-        if (session?.user) saveRaceToServer();
-      
-      }, [status]); */
-      
+
+
+    /*     useEffect(() => {
+            if (status !== 'finished') return;
+          
+            const raceKey = `${startTime}-${endTime}`;
+            if (savedRaceRef.current === raceKey) return;
+          
+            savedRaceRef.current = raceKey;
+          
+            saveRace(wpm, accuracy, 'solo', errors);
+            if (session?.user) saveRaceToServer();
+          
+          }, [status]); */
+
 
     const handleReset = () => {
         raceIdRef.current = null;
@@ -367,8 +367,8 @@ const PracticePage: React.FC = () => {
                             <CyberButton onClick={handleReset} glow disabled={isSaving}>
                                 <RefreshCw size={18} /> PRACTICE AGAIN
                             </CyberButton>
-                            <CyberButton 
-                                variant="secondary" 
+                            <CyberButton
+                                variant="secondary"
                                 onClick={() => router.push('/dashboard')}
                                 disabled={isSaving}
                             >
