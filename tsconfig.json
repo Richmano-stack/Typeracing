@@ -27,7 +27,8 @@
     "baseUrl": ".", // Defines the base directory for path lookups (usually the project root)
     "paths": {
       "@/*": [
-        "./app/*"
+        "./app/*",
+        "./src/*"
       ] // Maps the @/ prefix to the app directory
     }
     // --- Configuration for @/ alias ends here ---
