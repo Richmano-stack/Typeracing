@@ -8,25 +8,19 @@ import CyberCard from '@/components/ui/CyberCard';
 
 const actionCards = [
   {
-    title: 'Quick Race',
-    description: "Compete against the grid instantly.",
-    href: '/race',
+    title: 'SOLO_PROTOCOL',
+    description: "Server-authoritative high-speed performance test. Every keystroke is monitored.",
+    href: '/solo-race',
     icon: Zap,
     isPrimary: true,
   },
   {
-    title: 'Private Lobby',
-    description: "Challenge friends to a duel.",
-    href: '/create',
+    title: 'PRIVATE_LOBBY',
+    description: "Encrypted 1v1 duels. Challenge a specific pilot to a localized race.",
+    href: '#',
     icon: Users,
     isPrimary: false,
-  },
-  {
-    title: 'Solo Drill',
-    description: "Hone your reflexes in isolation.",
-    href: '/practice',
-    icon: Brain,
-    isPrimary: false,
+    isLocked: true,
   },
 ];
 
@@ -54,7 +48,7 @@ const HeroSection: React.FC = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <Link href="/race">
+          <Link href="/solo-race">
             <CyberButton size="lg" glow className="text-xl px-12 py-6">
               <Play size={24} />
               <span>Initiate Race</span>
@@ -83,11 +77,21 @@ const HeroSection: React.FC = () => {
       </div>
 
       {/* Feature Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
         {actionCards.map((card) => (
-          <Link key={card.title} href={card.href} className="group">
+          <Link 
+            key={card.title} 
+            href={card.href} 
+            className={`group ${card.isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={(e) => card.isLocked && e.preventDefault()}
+          >
             <CyberCard className="h-full transition-transform duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_0_30px_rgba(0,243,255,0.1)]">
-              <div className="flex flex-col items-center text-center h-full">
+              <div className="flex flex-col items-center text-center h-full relative">
+                {card.isLocked && (
+                    <div className="absolute -top-2 -right-2 bg-[var(--border)] text-[var(--text-secondary)] px-2 py-0.5 text-[8px] font-bold tracking-widest border border-[var(--border)] rounded-sm">
+                        LOCKED_PROTOCOL
+                    </div>
+                )}
                 <div className={`p-4 rounded-full mb-4 ${card.isPrimary ? 'bg-[var(--primary)] text-black' : 'bg-[rgba(255,255,255,0.05)] text-[var(--primary)]'}`}>
                   <card.icon size={32} />
                 </div>
@@ -97,6 +101,11 @@ const HeroSection: React.FC = () => {
                 <p className="text-[var(--text-secondary)] font-mono text-sm">
                   {card.description}
                 </p>
+                {card.isLocked && (
+                    <p className="mt-4 text-[8px] text-[var(--primary)] font-bold tracking-[0.3em] uppercase opacity-60">
+                         Coming Soon
+                    </p>
+                )}
               </div>
             </CyberCard>
           </Link>
