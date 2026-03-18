@@ -36,6 +36,7 @@ export default function RegisterForm() {
             onRequest: () => setIsLoading(true),
             onSuccess: () => {
                 setIsLoading(false);
+                window.location.href = "/dashboard";
             },
             onError: (ctx) => {
                 setError(ctx.error.message);
