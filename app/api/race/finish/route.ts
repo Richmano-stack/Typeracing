@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import redis from "@/lib/redis";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 const FinishRaceSchema = z.object({
     raceId: z.string().uuid(),
@@ -10,6 +12,10 @@ const FinishRaceSchema = z.object({
 
 export async function POST(req: Request) {
     try {
+        const session = await auth.api.getSession({
+            headers: await headers()
+        });
+
         const body = await req.json();
 
         // 1. Input Validation (Zod)
@@ -62,19 +68,22 @@ export async function POST(req: Request) {
         const wordsTyped = expectedLength / 5;
         const wpm = wordsTyped / durationMinutes;
 
-        // 6. Postgres Persistence (Prisma)
-        await prisma.raceResult.create({
-            data: {
-                userId: null, // Null for now
-                mode: "solo",
-                wpm: wpm,
-                accuracy: accuracy,
-                // The schema has duration_seconds, prompt asks to save duration_ms, 
-                // but we map it into duration_seconds so it satisfies the database constraint.
-                duration_seconds: Math.round(durationMs / 1000), 
-                text_id: textId,
-            }
-        });
+        // 6. Conditional Postgres Persistence (Prisma)
+        let saved = false;
+
+        if (session?.user) {
+            await prisma.raceResult.create({
+                data: {
+                    userId: session.user.id,
+                    mode: "solo",
+                    wpm: wpm,
+                    accuracy: accuracy,
+                    duration_seconds: Math.round(durationMs / 1000), 
+                    text_id: textId,
+                }
+            });
+            saved = true;
+        }
 
         // 7. Cleanup
         await redis.del(redisKey);
@@ -83,7 +92,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
             wpm: wpm,
             accuracy: accuracy,
-            durationMs: durationMs
+            durationMs: durationMs,
+            saved: saved
         });
 
     } catch (error) {
