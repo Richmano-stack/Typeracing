@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Terminal, LogOut, User, ChevronDown } from 'lucide-react';
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from 'next/image';
 
 interface HeaderAuthenticatedProps {
@@ -20,6 +20,8 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
     const [isPending, setIsPending] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    const pathname = usePathname();
+    const { data: session } = authClient.useSession();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -38,7 +40,7 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
         await authClient.signOut({
             fetchOptions: {
                 onSuccess: () => {
-                    window.location.href="/"; // Redirect after successful logout
+                    window.location.href = "/"; // Redirect after successful logout
                 },
                 onRequest: () => {
                     setIsPending(true);
@@ -50,6 +52,9 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
             },
         });
     };
+
+    const isDashboard = pathname === '/dashboard';
+    const displayUser = session?.user || user;
 
     return (
         <header
@@ -72,16 +77,34 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
 
                 {/* Navigation */}
                 <nav className="hidden md:flex items-center gap-8">
-                    {['Dashboard', 'Race', 'Leaderboard', 'Profile'].map((item) => (
-                        <Link
-                            key={item}
-                            href={`/${item.toLowerCase()}`}
-                            className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors relative group"
-                        >
-                            {item}
-                            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--primary)] transition-all group-hover:w-full" />
-                        </Link>
-                    ))}
+                    {isDashboard ? (
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2 font-mono">
+                                <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-tighter">Best_WPM:</span>
+                                <span className="text-sm font-bold text-[var(--primary)]">
+                                    {(displayUser as any)?.best_wpm || 0}
+                                </span>
+                            </div>
+                            <div className="w-[1px] h-4 bg-[var(--border)] opacity-50" />
+                            <div className="flex items-center gap-2 font-mono">
+                                <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-tighter">Sync_Count:</span>
+                                <span className="text-sm font-bold text-white">
+                                    {(displayUser as any)?.total_races || 0}
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        ['Dashboard', 'Race', 'Leaderboard', 'Profile'].map((item) => (
+                            <Link
+                                key={item}
+                                href={`/${item.toLowerCase()}`}
+                                className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors relative group"
+                            >
+                                {item}
+                                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--primary)] transition-all group-hover:w-full" />
+                            </Link>
+                        ))
+                    )}
                 </nav>
 
                 {/* User Menu */}

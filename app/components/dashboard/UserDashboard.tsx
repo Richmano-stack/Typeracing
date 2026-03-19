@@ -2,8 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Trophy, Zap, Target, Flame, Play, Swords, Keyboard } from 'lucide-react';
-import CyberCard from '@/components/ui/CyberCard';
+import { Swords, Zap } from 'lucide-react';
 import CyberButton from '@/components/ui/CyberButton';
 import { User } from '@prisma/client';
 
@@ -31,8 +30,8 @@ interface UserDashboardProps {
 const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces }) => {
     return (
         <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] p-8 md:p-12 text-center">
+            <div className="max-w-6xl mx-auto space-y-6">
+                <div className="relative overflow-hidden rounded-lg border border-[var(--primary)] bg-[rgba(0,243,255,0.05)] py-6 md:py-8 px-8 text-center">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50" />
 
                     <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-white mb-4"
@@ -44,55 +43,25 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                     </p>
 
                     <div className="flex flex-col sm:flex-row justify-center gap-4 flex-wrap">
-                        <Link href="/race">
+                        <Link href="/solo-race">
                             <CyberButton size="lg" glow>
-                                <Play size={20} />
-                                <span>Quick Race</span>
+                                <Zap size={20} />
+                                <span>Solo Protocol</span>
                             </CyberButton>
                         </Link>
-                        <Link href="/practice">
-                            <CyberButton variant="secondary" size="lg">
-                                <Keyboard size={20} />
-                                <span>Practice Mode</span>
-                            </CyberButton>
-                        </Link>
-                        <Link href="/create">
-                            <CyberButton variant="secondary" size="lg">
+                        <Link href="#">
+                            <CyberButton variant="secondary" size="lg" className="opacity-50 cursor-not-allowed">
                                 <Swords size={20} />
-                                <span>Private Lobby</span>
+                                <span className="flex items-center">
+                                    Private Lobby
+                                    <span className="ml-2 text-[10px] bg-[rgba(0,243,255,0.1)] px-1 rounded border border-[var(--primary)] text-[var(--primary)] font-mono tracking-tighter">(COMING_SOON)</span>
+                                </span>
                             </CyberButton>
                         </Link>
                     </div>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <CyberCard title="Races" icon={<Trophy size={24} />}>
-                        <p className="text-4xl font-black text-white">{stats.racesPlayed}</p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Completed</p>
-                    </CyberCard>
 
-                    <CyberCard title="Best WPM" icon={<Zap size={24} />}>
-                        <p className="text-4xl font-black text-[var(--primary)]" style={{ textShadow: '0 0 10px rgba(0,243,255,0.5)' }}>
-                            {stats.bestWpm || 0}
-                        </p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Peak Speed</p>
-                    </CyberCard>
-
-                    <CyberCard title="Accuracy" icon={<Target size={24} />}>
-                        <p className="text-4xl font-black text-[var(--success)]">
-                            {stats.accuracy || 0}%
-                        </p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Average Precision</p>
-                    </CyberCard>
-
-                    <CyberCard title="Recent Activity" icon={<Flame size={24} />}>
-                        <p className="text-4xl font-black text-[var(--secondary)]">
-                            Active
-                        </p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 font-mono uppercase">Status</p>
-                    </CyberCard>
-                </div>
 
                 <div className="space-y-4">
                     <h2 className="text-2xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -107,40 +76,41 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                                     <th className="px-6 py-4 font-bold">Date</th>
                                     <th className="px-6 py-4 font-bold">Type</th>
                                     <th className="px-6 py-4 font-bold">WPM</th>
-                                    <th className="px-6 py-4 font-bold">Accuracy</th>
-                                    <th className="px-6 py-4 font-bold">Errors</th>
+                                    <th className="px-6 py-4 font-bold text-right">Accuracy</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                                 {recentRaces && recentRaces.length > 0 ? (
-                                    recentRaces.map((race) => (
+                                    recentRaces.slice(0, 5).map((race) => (
                                         <tr key={race.id} className="hover:bg-[var(--bg-surface)] transition-colors">
-                                            <td className="px-6 py-4 font-mono text-[var(--text-muted)]">
+                                            <td className="px-6 py-4 font-mono text-[var(--text-muted)] opacity-50 text-xs">
                                                 {race.formattedDate}
                                             </td>
-                                            <td className="px-6 py-4 font-mono text-[var(--text-secondary)] uppercase text-xs">
-                                                {race.raceType}
+                                            <td className="px-6 py-4 font-mono text-[var(--text-secondary)] uppercase text-[10px]">
+                                                {race.raceType === 'solo' ? '[SOLO_PROTOCOL]' : race.raceType}
                                             </td>
-                                            <td className="px-6 py-4 font-bold text-white">
+                                            <td className="px-6 py-4 font-black text-white text-lg">
                                                 {race.wpm}
                                             </td>
-                                            <td className="px-6 py-4 font-mono text-[var(--success)]">
+                                            <td className={`px-6 py-4 font-mono text-right ${race.accuracy > 95 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'}`}>
                                                 {race.accuracy}%
-                                            </td>
-                                            <td className="px-6 py-4 font-mono text-[var(--error)]">
-                                                {race.errors}
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-[var(--text-muted)] font-mono">
-                                            NO RACE DATA FOUND. INITIATE PROTOCOL TO BEGIN.
+                                        <td colSpan={4} className="px-6 py-8 text-center text-[var(--text-muted)] font-mono">
+                                            &gt; NO LOGS DETECTED. INITIALIZE NEURAL SYNC.
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                    <div className="flex justify-end pr-2">
+                        <Link href="/profile" className="text-[10px] font-mono text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors opacity-70">
+                            [ VIEW_ALL_LOGS -&gt; ]
+                        </Link>
                     </div>
                 </div>
 
