@@ -79,6 +79,8 @@ model RaceResult {
   textPassage      TextPassage  @relation(fields: [text_id], references: [id])
   completedAt      DateTime     @default(now())
 
+  @@index([userId, completedAt(sort: Desc)])
+  @@index([mode, wpm(sort: Desc)])
   @@map("race_results")
 }
 

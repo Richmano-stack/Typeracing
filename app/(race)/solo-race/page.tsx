@@ -7,12 +7,15 @@ import { useRouter } from 'next/navigation';
 import { raceApi, FinishResponse } from '@/services/raceApi';
 import ResultsModal from '@/components/ResultsModal';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 const NEON_GREEN = '#00ff41';
 const BRIGHT_RED = '#ff003c';
 const DIM_RED = 'rgba(255, 0, 60, 0.5)';
 
 const SoloRacePage: React.FC = () => {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [text, setText] = useState<string>("");
     const [raceId, setRaceId] = useState<string | null>(null);
     const [isLoadingText, setIsLoadingText] = useState(true);
@@ -66,12 +69,15 @@ const SoloRacePage: React.FC = () => {
         try {
             const data = await raceApi.finish(raceId, totalCharactersInserted);
             setResults(data);
+            
+            // Invalidate user-telemetry to update the HUD
+            queryClient.invalidateQueries({ queryKey: ['user-telemetry'] });
         } catch (err) {
             console.error("Failed to finish race", err);
         } finally {
             setIsDecrypting(false);
         }
-    }, [raceId, totalCharactersInserted]);
+    }, [raceId, totalCharactersInserted, queryClient]);
 
     useEffect(() => {
         if (status === 'finished') {
