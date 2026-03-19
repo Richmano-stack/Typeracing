@@ -51,7 +51,7 @@ describe("Solo Race Lifecycle", () => {
         await prisma.$disconnect();
     });
 
-    it("should return stats and NOT save to DB for guest users", async () => {
+    it("should return stats and SAVE to DB for guest users", async () => {
         const initialRaceCount = await prisma.raceResult.count();
         let currentRaceId = "";
         let expectedLength = 0;
@@ -109,13 +109,19 @@ describe("Solo Race Lifecycle", () => {
                 expect(typeof data.wpm).toBe("number");
                 expect(typeof data.accuracy).toBe("number");
                 // Expected `saved` behavior
-                expect(data.saved).toBe(false);
+                expect(data.saved).toBe(true);
             }
         });
 
-        // Database Check: Verify NO new row was created
+        // Database Check: Verify a new row WAS created
         const finalRaceCount = await prisma.raceResult.count();
-        expect(finalRaceCount).toBe(initialRaceCount);
+        expect(finalRaceCount).toBe(initialRaceCount + 1);
+
+        const latestResult = await prisma.raceResult.findFirst({
+            orderBy: { completedAt: "desc" }
+        });
+        expect(latestResult).toBeDefined();
+        expect(latestResult?.userId).toBeNull();
 
         // Redis Check: Verify deletion happens even for guests
         const existsAfterFinish = await redis.exists(`race:${currentRaceId}`);
@@ -223,6 +229,11 @@ describe("Solo Race Lifecycle", () => {
         expect(latestResult).toBeDefined();
         expect(latestResult?.userId).toBe(authUser!.id);
         expect(latestResult?.wpm).toBeCloseTo(finalWpm, 2); 
+
+        // --- STATS SYNC VERIFICATION ---
+        const updatedUser = await prisma.user.findUnique({ where: { id: authUser!.id }});
+        expect(updatedUser!.total_races).toBe(1);
+        expect(updatedUser!.best_wpm).toBeCloseTo(finalWpm, 2);
 
         // Redis cleanup
         const existsAfterFinish = await redis.exists(`race:${currentRaceId}`);

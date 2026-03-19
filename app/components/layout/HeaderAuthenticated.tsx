@@ -7,6 +7,8 @@ import { authClient } from "@/lib/auth-client";
 import { usePathname, useRouter } from "next/navigation";
 import Image from 'next/image';
 
+import { useQuery } from '@tanstack/react-query';
+
 interface HeaderAuthenticatedProps {
     user: {
         name?: string | null;
@@ -22,6 +24,22 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
     const router = useRouter();
     const pathname = usePathname();
     const { data: session } = authClient.useSession();
+
+    const { data: stats, isLoading } = useQuery({
+        queryKey: ['user-telemetry'],
+        queryFn: async () => {
+            const res = await fetch('/api/user/stats');
+            if (!res.ok) throw new Error('Failed to fetch stats');
+            return res.json();
+        },
+        staleTime: 30000,
+        enabled: !!session?.user,
+    });
+
+    // Fallback values
+    const bestWpm = stats?.bestWpm ?? 0;
+    const recentAvgWpm = stats?.recentAvgWpm ?? 0;
+    const totalRaces = stats?.totalRaces ?? 0;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -54,7 +72,6 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
     };
 
     const isDashboard = pathname === '/dashboard';
-    const displayUser = session?.user || user;
 
     return (
         <header
@@ -78,23 +95,37 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                 {/* Navigation */}
                 <nav className="hidden md:flex items-center gap-8">
                     {isDashboard ? (
-                        <div className="flex items-center gap-6">
-                            <div className="flex items-center gap-2 font-mono">
-                                <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-tighter">Best_WPM:</span>
-                                <span className="text-sm font-bold text-[var(--primary)]">
-                                    {(displayUser as any)?.best_wpm || 0}
+                        <div className="flex items-center gap-6 bg-[rgba(255,255,255,0.03)] px-4 py-2 border border-[var(--border)] rounded-sm">
+                            {/* Segment 1: BEST_WPM */}
+                            <div className="flex flex-col items-center min-w-[60px] font-mono">
+                                <span className="text-[8px] text-[var(--text-secondary)] uppercase tracking-tighter opacity-70">Best_WPM</span>
+                                <span className="text-sm font-bold text-[var(--primary)] tabular-nums">
+                                    {isLoading ? '---' : bestWpm}
                                 </span>
                             </div>
-                            <div className="w-[1px] h-4 bg-[var(--border)] opacity-50" />
-                            <div className="flex items-center gap-2 font-mono">
-                                <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-tighter">Sync_Count:</span>
-                                <span className="text-sm font-bold text-white">
-                                    {(displayUser as any)?.total_races || 0}
+
+                            <div className="w-[1px] h-4 bg-[var(--border)] opacity-30" />
+
+                            {/* Segment 2: AVG_10 */}
+                            <div className="flex flex-col items-center min-w-[60px] font-mono">
+                                <span className="text-[8px] text-[var(--text-secondary)] uppercase tracking-tighter opacity-70">Avg_10</span>
+                                <span className="text-sm font-bold text-[#00f3ff] tabular-nums">
+                                    {isLoading ? '---' : recentAvgWpm}
+                                </span>
+                            </div>
+
+                            <div className="w-[1px] h-4 bg-[var(--border)] opacity-30" />
+
+                            {/* Segment 3: SYNC_COUNT */}
+                            <div className="flex flex-col items-center min-w-[60px] font-mono">
+                                <span className="text-[8px] text-[var(--text-secondary)] uppercase tracking-tighter opacity-70">Sync_Count</span>
+                                <span className="text-sm font-bold text-white tabular-nums">
+                                    {isLoading ? '---' : totalRaces}
                                 </span>
                             </div>
                         </div>
                     ) : (
-                        ['Dashboard', 'Race', 'Leaderboard', 'Profile'].map((item) => (
+                        ['Leaderboard', 'Profile'].map((item) => (
                             <Link
                                 key={item}
                                 href={`/${item.toLowerCase()}`}

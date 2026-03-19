@@ -68,22 +68,43 @@ export async function POST(req: Request) {
         const wordsTyped = expectedLength / 5;
         const wpm = wordsTyped / durationMinutes;
 
-        // 6. Conditional Postgres Persistence (Prisma)
-        let saved = false;
-
-        if (session?.user) {
-            await prisma.raceResult.create({
+        // 6. Database Transaction (Atomic Persistence)
+        const result = await prisma.$transaction(async (tx) => {
+            // A. Create RaceResult (Always)
+            const newRaceResult = await tx.raceResult.create({
                 data: {
-                    userId: session.user.id,
+                    userId: session?.user?.id || null, // Nullable for guests
                     mode: "solo",
                     wpm: wpm,
                     accuracy: accuracy,
-                    duration_seconds: Math.round(durationMs / 1000), 
+                    duration_seconds: Math.round(durationMs / 1000),
                     text_id: textId,
                 }
             });
-            saved = true;
-        }
+
+            // B. Update User Aggregate Stats (If Authenticated)
+            if (session?.user?.id) {
+                const user = await tx.user.findUnique({
+                    where: { id: session.user.id },
+                    select: { best_wpm: true }
+                });
+
+                if (user) {
+                    await tx.user.update({
+                        where: { id: session.user.id },
+                        data: {
+                            total_races: { increment: 1 },
+                            // Only update best_wpm if the current race's WPM is higher
+                            best_wpm: Math.max(user.best_wpm, wpm)
+                        }
+                    });
+                }
+            }
+
+            return newRaceResult;
+        });
+
+        const saved = !!result;
 
         // 7. Cleanup
         await redis.del(redisKey);
