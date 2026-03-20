@@ -96,7 +96,8 @@ const SoloRacePage: React.FC = () => {
 
     const renderedText = useMemo(() => {
         if (!text) return null;
-        return text.split('').map((char, i) => {
+        
+        const chars = text.split('').map((char, i) => {
             let color = 'var(--text-muted)';
             let backgroundColor = 'transparent';
             let textDecoration = 'none';
@@ -116,6 +117,7 @@ const SoloRacePage: React.FC = () => {
             return (
                 <span 
                     key={i} 
+                    className="relative"
                     style={{ 
                         color, 
                         backgroundColor, 
@@ -123,11 +125,19 @@ const SoloRacePage: React.FC = () => {
                         transition: 'all 0.1s ease-out'
                     }}
                 >
+                    {status !== 'finished' && i === currentIndex && <span className="caret" />}
                     {char}
                 </span>
             );
         });
-    }, [text, userInput, currentIndex]);
+
+        // If we've typed everything correctly and are at the end, show caret after last char
+        if (status !== 'finished' && currentIndex === text.length) {
+            chars.push(<span key="end-caret" className="caret" />);
+        }
+
+        return chars;
+    }, [text, userInput, currentIndex, status]);
 
     const handleReset = () => {
         setIsModalOpen(false);
@@ -213,7 +223,6 @@ const SoloRacePage: React.FC = () => {
                     
                     <div className="relative z-20 break-words">
                         {renderedText}
-                        {status !== 'finished' && <span className="caret" />}
                     </div>
 
                     {/* Hidden Input field */}
