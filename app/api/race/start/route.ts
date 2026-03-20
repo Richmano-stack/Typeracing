@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         // If it wasn't set, it means it already exists. Fetch the existing one to return it.
         let finalStartTime = startTime;
         if (!wasSet) {
-            const existingStartTime = await redis.hget(redisKey, "startTime");
+            const existingStartTime = await redis.hget<string>(redisKey, "startTime");
             if (existingStartTime) {
                 finalStartTime = parseInt(existingStartTime, 10);
             }
