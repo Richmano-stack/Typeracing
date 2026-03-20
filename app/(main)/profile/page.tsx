@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { User, Activity, Trophy, Flag, Zap, Target } from 'lucide-react';
+import { User, Activity, Trophy, Zap, Target } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import CyberCard from '@/components/ui/CyberCard';
+import { getUserStats } from "@/lib/stats";
 
 const ProfilePage = async () => {
     const session = await auth.api.getSession({
@@ -14,20 +14,10 @@ const ProfilePage = async () => {
         redirect('/login');
     }
 
-    // Fetch user data from database
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-            name: true,
-            createdAt: true,
-            best_wpm: true,
-            average_wpm: true,
-            total_races: true,
-            // avgAccuracy is not in schema either, I'll remove it or check again
-        },
-    });
+    // Fetch accurate user stats using the shared utility
+    const stats = await getUserStats(session.user.id);
 
-    if (!user) {
+    if (!stats) {
         redirect('/login');
     }
 
@@ -41,12 +31,12 @@ const ProfilePage = async () => {
     };
 
     const displayUser = {
-        username: user.name || "User",
-        bestWpm: Math.round(Number(user.best_wpm) || 0),
-        avgWpm: Math.round(Number(user.average_wpm) || 0),
-        racesCompleted: user.total_races || 0,
-        accuracy: 100, // Placeholder as avgAccuracy is missing from schema
-        joinedDate: formatDate(user.createdAt),
+        username: stats.name || "User",
+        bestWpm: Math.round(stats.bestWpm),
+        avgWpm: Math.round(stats.avgWpm),
+        racesCompleted: stats.totalRaces,
+        accuracy: stats.avgAccuracy,
+        joinedDate: stats.createdAt ? formatDate(stats.createdAt) : "Recently",
     };
 
     return (

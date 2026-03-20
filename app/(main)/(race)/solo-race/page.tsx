@@ -22,7 +22,7 @@ const SoloRacePage: React.FC = () => {
     const [isDecrypting, setIsDecrypting] = useState(false);
     const [results, setResults] = useState<FinishResponse | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    
+
     const inputRef = useRef<HTMLInputElement>(null);
 
     const {
@@ -69,7 +69,7 @@ const SoloRacePage: React.FC = () => {
         try {
             const data = await raceApi.finish(raceId, totalCharactersInserted);
             setResults(data);
-            
+
             // Invalidate user-telemetry to update the HUD
             queryClient.invalidateQueries({ queryKey: ['user-telemetry'] });
         } catch (err) {
@@ -96,7 +96,7 @@ const SoloRacePage: React.FC = () => {
 
     const renderedText = useMemo(() => {
         if (!text) return null;
-        
+
         const chars = text.split('').map((char, i) => {
             let color = 'var(--text-muted)';
             let backgroundColor = 'transparent';
@@ -115,12 +115,12 @@ const SoloRacePage: React.FC = () => {
             }
 
             return (
-                <span 
-                    key={i} 
+                <span
+                    key={i}
                     className="relative"
-                    style={{ 
-                        color, 
-                        backgroundColor, 
+                    style={{
+                        color,
+                        backgroundColor,
                         textDecoration,
                         transition: 'all 0.1s ease-out'
                     }}
@@ -210,7 +210,7 @@ const SoloRacePage: React.FC = () => {
 
             {/* Main Terminal Area */}
             <div className="relative w-full max-w-4xl">
-                <div 
+                <div
                     onClick={() => inputRef.current?.focus()}
                     className={`
                         relative p-10 md:p-14 cyber-card
@@ -220,7 +220,7 @@ const SoloRacePage: React.FC = () => {
                 >
                     {/* Scanline Effect */}
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.02),rgba(0,255,0,0.01),rgba(0,0,255,0.02))] bg-[length:100%_2px,3px_100%] z-10" />
-                    
+
                     <div className="relative z-20 break-words">
                         {renderedText}
                     </div>
@@ -232,7 +232,7 @@ const SoloRacePage: React.FC = () => {
                         className="absolute inset-0 opacity-0 cursor-default"
                         value={userInput}
                         onKeyDown={handleKeyDown}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         readOnly={status === 'finished'}
                         autoFocus
                     />
@@ -250,13 +250,13 @@ const SoloRacePage: React.FC = () => {
             {/* Controls */}
             {status !== 'finished' && (
                 <div className="mt-12 flex gap-6">
-                    <button 
+                    <button
                         onClick={handleReset}
                         className="px-8 py-3 bg-[var(--bg-primary-subtle)] border border-[var(--border)] hover:bg-[var(--bg-primary-hover)] hover:border-[var(--primary)] transition-all uppercase tracking-widest text-[10px] flex items-center gap-2"
                     >
                         <RefreshCw size={14} /> Re-Initialize Protocol
                     </button>
-                    <button 
+                    <button
                         onClick={() => router.push('/dashboard')}
                         className="px-8 py-3 bg-[var(--bg-base)] border border-[var(--border)] hover:border-[var(--secondary)] transition-all uppercase tracking-widest text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                     >
@@ -266,7 +266,7 @@ const SoloRacePage: React.FC = () => {
             )}
 
             {/* Results Modal */}
-            <ResultsModal 
+            <ResultsModal
                 isOpen={isModalOpen}
                 isLoading={isDecrypting}
                 results={results}
@@ -276,4 +276,4 @@ const SoloRacePage: React.FC = () => {
     );
 };
 
-export default SoloRacePage;
+export default SoloRacePage;
