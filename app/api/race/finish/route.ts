@@ -10,6 +10,13 @@ const FinishRaceSchema = z.object({
     totalCharactersInserted: z.number().int().positive(),
 });
 
+interface RaceData {
+    startTime?: string;
+    expectedLength: string;
+    textId: string;
+    [key: string]: string | undefined;
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth.api.getSession({
@@ -28,7 +35,7 @@ export async function POST(req: Request) {
         const redisKey = `race:${raceId}`;
 
         // 2. Fetch from Redis
-        const raceData = await redis.hgetall(redisKey);
+        const raceData = await redis.hgetall<RaceData>(redisKey);
         
         // If it doesn't exist, return 404
         if (!raceData || Object.keys(raceData).length === 0) {

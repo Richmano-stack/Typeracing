@@ -1,12 +1,13 @@
 // This is your merged BetterAuth + Typeracing Schema
 
-datasource db {
-  provider = "postgresql"
-}
-
 generator client {
   provider = "prisma-client-js"
 }
+
+datasource db {
+  provider  = "postgresql"
+}
+
 
 // --- BETTERAUTH CORE TABLES (EXTENDED) ---
 
