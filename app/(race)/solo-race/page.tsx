@@ -9,9 +9,9 @@ import ResultsModal from '@/components/ResultsModal';
 
 import { useQueryClient } from '@tanstack/react-query';
 
-const NEON_GREEN = '#00ff41';
-const BRIGHT_RED = '#ff003c';
-const DIM_RED = 'rgba(255, 0, 60, 0.5)';
+const NEON_GREEN = 'var(--primary)';
+const BRIGHT_RED = 'var(--error)';
+const DIM_RED = 'var(--secondary)';
 
 const SoloRacePage: React.FC = () => {
     const router = useRouter();
@@ -97,7 +97,7 @@ const SoloRacePage: React.FC = () => {
     const renderedText = useMemo(() => {
         if (!text) return null;
         return text.split('').map((char, i) => {
-            let color = 'rgba(255, 255, 255, 0.3)';
+            let color = 'var(--text-muted)';
             let backgroundColor = 'transparent';
             let textDecoration = 'none';
 
@@ -138,7 +138,7 @@ const SoloRacePage: React.FC = () => {
 
     if (isLoadingText) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-[#00ff41] font-mono">
+            <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)] text-[var(--primary)] font-mono">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="animate-spin" size={48} />
                     <p className="tracking-[0.2em] animate-pulse text-sm">INITIALIZING TERMINAL...</p>
@@ -148,7 +148,7 @@ const SoloRacePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-mono p-4 md:p-8 flex flex-col items-center overflow-hidden">
+        <div className="min-h-screen bg-[var(--bg-base)] text-white font-mono p-4 md:p-8 flex flex-col items-center overflow-hidden">
             <style jsx>{`
                 @keyframes pulse-red {
                     0% { box-shadow: 0 0 5px rgba(255, 0, 60, 0.2); }
@@ -175,13 +175,13 @@ const SoloRacePage: React.FC = () => {
             `}</style>
 
             {/* Header / HUD */}
-            <div className="w-full max-w-5xl flex justify-between items-start mb-12 border-b border-white/10 pb-6">
+            <div className="w-full max-w-5xl flex justify-between items-start mb-12 border-b border-[var(--border)] pb-6">
                 <div>
                     <h1 className="text-3xl font-black italic tracking-tighter flex items-center gap-3">
-                        <Zap className="text-[#00ff41]" fill="#00ff41" />
-                        CYBER_RACE <span className="text-xs not-italic font-normal tracking-widest opacity-40 ml-2">v2.0.4-SOLO</span>
+                        <Zap className="text-[var(--primary)]" fill="var(--primary)" />
+                        CYBER_RACE <span className="text-xs not-italic font-normal tracking-widest text-[var(--text-muted)] ml-2">v2.0.4-SOLO</span>
                     </h1>
-                    <div className="mt-2 flex gap-4 text-[10px] tracking-widest uppercase opacity-60">
+                    <div className="mt-2 flex gap-4 text-[10px] tracking-widest uppercase text-[var(--text-secondary)]">
                         <span>LATENCY: 12ms</span>
                         <span>KERNEL: STABLE</span>
                         <span>BUFF_LIMIT: 5_CHAR</span>
@@ -190,8 +190,8 @@ const SoloRacePage: React.FC = () => {
 
                 <div className="flex gap-12">
                     <div className="text-right">
-                        <div className="text-[10px] opacity-40 uppercase tracking-widest mb-1">Status</div>
-                        <div className={`text-sm ${isBufferFull ? 'text-[#ff003c]' : 'text-[#00ff41]'}`}>
+                        <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">Status</div>
+                        <div className={`text-sm ${isBufferFull ? 'text-[var(--error)]' : 'text-[var(--primary)]'}`}>
                             {isBufferFull ? '!! BUFFER_FULL !!' : status === 'running' ? 'EXECUTING...' : 'IDLE_WAIT'}
                         </div>
                     </div>
@@ -203,7 +203,7 @@ const SoloRacePage: React.FC = () => {
                 <div 
                     onClick={() => inputRef.current?.focus()}
                     className={`
-                        relative p-10 md:p-14 bg-black/80 border border-white/10 rounded-sm
+                        relative p-10 md:p-14 cyber-card
                         text-2xl md:text-3xl leading-relaxed transition-all duration-300
                         ${isBufferFull ? 'buffer-full' : ''}
                     `}
@@ -231,7 +231,7 @@ const SoloRacePage: React.FC = () => {
 
                 {/* Warning HUD */}
                 {isBufferFull && (
-                    <div className="mt-6 flex items-center justify-center gap-3 text-[#ff003c] font-bold text-sm tracking-widest animate-pulse">
+                    <div className="mt-6 flex items-center justify-center gap-3 text-[var(--error)] font-bold text-sm tracking-widest animate-pulse">
                         <AlertTriangle size={18} />
                         CRITICAL ERROR: BUFFER OVERFLOW. CORRECT PREVIOUS INPUT.
                     </div>
@@ -243,13 +243,13 @@ const SoloRacePage: React.FC = () => {
                 <div className="mt-12 flex gap-6">
                     <button 
                         onClick={handleReset}
-                        className="px-8 py-3 bg-white/5 border border-white/20 hover:bg-white/10 hover:border-white/40 transition-all uppercase tracking-widest text-[10px] flex items-center gap-2"
+                        className="px-8 py-3 bg-[var(--bg-primary-subtle)] border border-[var(--border)] hover:bg-[var(--bg-primary-hover)] hover:border-[var(--primary)] transition-all uppercase tracking-widest text-[10px] flex items-center gap-2"
                     >
                         <RefreshCw size={14} /> Re-Initialize Protocol
                     </button>
                     <button 
                         onClick={() => router.push('/dashboard')}
-                        className="px-8 py-3 bg-black border border-white/10 hover:border-white/30 transition-all uppercase tracking-widest text-[10px] opacity-20 hover:opacity-100"
+                        className="px-8 py-3 bg-[var(--bg-base)] border border-[var(--border)] hover:border-[var(--secondary)] transition-all uppercase tracking-widest text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                     >
                         Abort Mission
                     </button>
