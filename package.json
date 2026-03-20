@@ -5,7 +5,7 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "dotenv -e .env.test -- prisma db push --accept-data-loss && vitest run"
@@ -52,7 +52,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "next-test-api-route-handler": "^5.0.3",
-    "prisma": "^7.2.0",
+    "prisma": "^7.5.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
