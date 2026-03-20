@@ -12,6 +12,7 @@ export interface FinishResponse {
     accuracy: number;
     durationMs: number;
     saved: boolean;
+    authenticated: boolean;
 }
 
 export const raceApi = {
