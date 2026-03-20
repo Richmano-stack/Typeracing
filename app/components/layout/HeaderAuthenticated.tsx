@@ -100,7 +100,7 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
                             <div className="flex flex-col items-center min-w-[60px] font-mono">
                                 <span className="text-[8px] text-[var(--text-secondary)] uppercase tracking-tighter opacity-70">Best_WPM</span>
                                 <span className="text-sm font-bold text-[var(--primary)] tabular-nums">
-                                    {isLoading ? '---' : bestWpm}
+                                    {isLoading ? '---' : Math.round(bestWpm)}
                                 </span>
                             </div>
 

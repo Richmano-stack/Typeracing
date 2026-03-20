@@ -61,7 +61,7 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                                 </div>
                                 {results.saved ? (
                                     <div className="bg-[#00ff41]/10 border border-[#00ff41] px-3 py-1 text-[#00ff41] text-[10px] font-bold tracking-widest uppercase">
-                                        Progress Saved
+                                        Stats Synchronized
                                     </div>
                                 ) : (
                                     <div className="bg-[#ffdf00]/10 border border-[#ffdf00] px-3 py-1 text-[#ffdf00] text-[10px] font-bold tracking-widest uppercase animate-pulse text-center">
@@ -107,7 +107,7 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                                     href="/register"
                                     className="w-full py-4 bg-[#ffdf00] text-black font-black uppercase tracking-[0.2em] hover:bg-white transition-all flex items-center justify-center gap-2 text-xs"
                                 >
-                                    <UserPlus size={16} /> SESSION NOT RECORDED: SIGN UP TO CLAIM RECORD
+                                    <UserPlus size={16} /> SIGN UP TO TRACK YOUR PROGRESS
                                 </Link>
                             </div>
                         )}

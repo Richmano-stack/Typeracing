@@ -104,7 +104,7 @@ export async function POST(req: Request) {
             return newRaceResult;
         });
 
-        const saved = !!result;
+        const saved = !!result && !!session?.user?.id;
 
         // 7. Cleanup
         await redis.del(redisKey);
@@ -114,7 +114,8 @@ export async function POST(req: Request) {
             wpm: wpm,
             accuracy: accuracy,
             durationMs: durationMs,
-            saved: saved
+            saved: saved,
+            authenticated: !!session?.user?.id
         });
 
     } catch (error) {
