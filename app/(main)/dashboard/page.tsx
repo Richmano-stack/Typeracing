@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import UserDashboard from '@/components/dashboard/UserDashboard';
 import { redirect } from "next/navigation";
+import { getUserStats } from "@/lib/stats";
 
 export const metadata = {
     title: 'Dashboard | TypeRace',
@@ -18,15 +19,8 @@ export default async function DashboardPage() {
         redirect("/");
     }
 
-    const [userStats, recentRaces] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                total_races: true,
-                best_wpm: true,
-                average_wpm: true,
-            },
-        }),
+    const [statsResult, recentRaces] = await Promise.all([
+        getUserStats(session.user.id),
         prisma.raceResult.findMany({
             where: { userId: session.user.id },
             orderBy: { completedAt: 'desc' },
@@ -35,10 +29,10 @@ export default async function DashboardPage() {
     ]);
 
     const stats = {
-        racesPlayed: userStats?.total_races || 0,
-        bestWpm: Math.round(Number(userStats?.best_wpm) || 0),
-        accuracy: 100, // Placeholder
-        avgWpm: Math.round(Number(userStats?.average_wpm) || 0),
+        racesPlayed: statsResult.totalRaces,
+        bestWpm: Math.round(statsResult.bestWpm),
+        accuracy: statsResult.avgAccuracy,
+        avgWpm: Math.round(statsResult.avgWpm),
         streak: 0,
     };
 
