@@ -68,22 +68,23 @@ export async function POST(req: Request) {
         const wordsTyped = expectedLength / 5;
         const wpm = wordsTyped / durationMinutes;
 
-        // 6. Database Transaction (Atomic Persistence)
-        const result = await prisma.$transaction(async (tx) => {
-            // A. Create RaceResult (Always)
-            const newRaceResult = await tx.raceResult.create({
-                data: {
-                    userId: session?.user?.id || null, // Nullable for guests
-                    mode: "solo",
-                    wpm: wpm,
-                    accuracy: accuracy,
-                    duration_seconds: Math.round(durationMs / 1000),
-                    text_id: textId,
-                }
-            });
+        // 6. Database Transaction (Atomic Persistence - Authenticated Only)
+        let result = null;
+        if (session?.user?.id) {
+            result = await prisma.$transaction(async (tx) => {
+                // A. Create RaceResult
+                const newRaceResult = await tx.raceResult.create({
+                    data: {
+                        userId: session.user.id,
+                        mode: "solo",
+                        wpm: wpm,
+                        accuracy: accuracy,
+                        duration_seconds: Math.round(durationMs / 1000),
+                        text_id: textId,
+                    }
+                });
 
-            // B. Update User Aggregate Stats (If Authenticated)
-            if (session?.user?.id) {
+                // B. Update User Aggregate Stats
                 const user = await tx.user.findUnique({
                     where: { id: session.user.id },
                     select: { best_wpm: true }
@@ -99,12 +100,12 @@ export async function POST(req: Request) {
                         }
                     });
                 }
-            }
 
-            return newRaceResult;
-        });
+                return newRaceResult;
+            });
+        }
 
-        const saved = !!result && !!session?.user?.id;
+        const saved = !!result;
 
         // 7. Cleanup
         await redis.del(redisKey);

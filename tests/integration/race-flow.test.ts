@@ -51,7 +51,7 @@ describe("Solo Race Lifecycle", () => {
         await prisma.$disconnect();
     });
 
-    it("should return stats and SAVE to DB for guest users", async () => {
+    it("should return stats and NOT save to DB for guest users", async () => {
         const initialRaceCount = await prisma.raceResult.count();
         let currentRaceId = "";
         let expectedLength = 0;
@@ -114,15 +114,22 @@ describe("Solo Race Lifecycle", () => {
             }
         });
 
-        // Database Check: Verify a new row WAS created
+        // Database Check: Verify NO new row was created
         const finalRaceCount = await prisma.raceResult.count();
-        expect(finalRaceCount).toBe(initialRaceCount + 1);
+        expect(finalRaceCount).toBe(initialRaceCount);
 
+        // Verify no orphaned record was created with null userId
         const latestResult = await prisma.raceResult.findFirst({
+            where: { userId: null },
             orderBy: { completedAt: "desc" }
         });
-        expect(latestResult).toBeDefined();
-        expect(latestResult?.userId).toBeNull();
+        
+        // Ensure the latest null-user result is either non-existent or older than our test window
+        if (latestResult) {
+            const now = new Date();
+            const timeDiff = now.getTime() - latestResult.completedAt.getTime();
+            expect(timeDiff).toBeGreaterThan(5000); // 5 seconds old, not from this test
+        }
 
         // Redis Check: Verify deletion happens even for guests
         const existsAfterFinish = await redis.exists(`race:${currentRaceId}`);
