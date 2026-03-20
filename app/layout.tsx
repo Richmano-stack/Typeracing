@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "./components/layout/Header";
-import Footer from "./components/layout/Footer";
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { GuestStatsProvider } from "./hooks/useGuestStats";
 import Providers from "./providers";
@@ -35,11 +33,7 @@ export default function RootLayout({
       >
         <Providers>
           <GuestStatsProvider>
-            <Header />
-            <main className="pt-16 min-h-screen">{/* Décalage pour le header fixe */}
-              {children}
-            </main>
-            <Footer />
+            {children}
           </GuestStatsProvider>
         </Providers>
       </body>
