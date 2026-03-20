@@ -6,6 +6,7 @@ import { useSoloRace } from '@/hooks/useSoloRace';
 import { useRouter } from 'next/navigation';
 import { raceApi, FinishResponse } from '@/services/raceApi';
 import ResultsModal from '@/components/ResultsModal';
+import LiveWPM from '@/components/LiveWPM';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -22,6 +23,7 @@ const SoloRacePage: React.FC = () => {
     const [isDecrypting, setIsDecrypting] = useState(false);
     const [results, setResults] = useState<FinishResponse | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [startTime, setStartTime] = useState<number | null>(null);
 
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +90,7 @@ const SoloRacePage: React.FC = () => {
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         const isFirst = handleKey(e.key);
         if (isFirst && raceId) {
+            setStartTime(Date.now());
             triggerStartApi(raceId);
         }
     };
@@ -142,6 +145,7 @@ const SoloRacePage: React.FC = () => {
     const handleReset = () => {
         setIsModalOpen(false);
         setResults(null);
+        setStartTime(null);
         reset(); // Clear hook state
         initiateRace(); // Re-trigger initiate
     };
@@ -199,6 +203,11 @@ const SoloRacePage: React.FC = () => {
                 </div>
 
                 <div className="flex gap-12">
+                    <LiveWPM
+                        startTime={startTime}
+                        currentIndex={currentIndex}
+                        isFinished={status === 'finished'}
+                    />
                     <div className="text-right">
                         <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">Status</div>
                         <div className={`text-sm ${isBufferFull ? 'text-[var(--error)]' : 'text-[var(--primary)]'}`}>
