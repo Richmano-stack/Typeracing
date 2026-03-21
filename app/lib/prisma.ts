@@ -9,6 +9,10 @@ const globalForPrisma = globalThis as unknown as {
 
 const connectionString = process.env.DATABASE_URL;
 
+if (!connectionString) {
+    throw new Error("Missing Environment Variable: DATABASE_URL");
+}
+
 // Singleton pattern for the PG Pool to prevent connection leaks in development
 const pool = globalForPrisma.pgPool ?? new Pool({ connectionString });
 if (process.env.NODE_ENV !== "production") globalForPrisma.pgPool = pool;

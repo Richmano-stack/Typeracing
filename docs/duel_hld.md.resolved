@@ -1,0 +1,612 @@
+# High-Level Design: Server-Authoritative Duel Typing Game
+
+**Stack:** Next.js (App Router) · Prisma (Postgres/Supabase) · Upstash Redis  
+**Real-time Strategy:** REST Polling every 2 s · CSS transition ghost smoothing  
+**Auth Model:** Server is the single source of truth for clock, progress, and game state.
+
+---
+
+## A. Redis Schema & State Machine
+
+### Hash Structure: `race:{roomId}`
+
+```
+race:{roomId}
+├── state            STRING  — current FSM state (see below)
+├── host_id          STRING  — userId of the host
+├── guest_id         STRING  — userId of the guest (empty until join)
+├── prompt_id        STRING  — ID of the selected text prompt
+├── prompt_text      STRING  — cached prompt text (avoids DB round-trip)
+├── host_ready       BOOLEAN — "0" | "1"
+├── guest_ready      BOOLEAN — "0" | "1"
+├── target_start_ms  INTEGER — Unix ms of when the race will begin (server clock)
+├── created_at_ms    INTEGER — creation timestamp (for TTL housekeeping)
+│
+├── host_progress    INTEGER — chars typed correctly by host
+├── guest_progress   INTEGER — chars typed correctly by guest
+├── host_wpm         INTEGER — latest reported WPM for host
+├── guest_wpm        INTEGER — latest reported WPM for guest
+├── host_last_active INTEGER — Unix ms of last /sync call by host
+├── guest_last_active INTEGER — Unix ms of last /sync call by guest
+│
+├── host_finished_ms  INTEGER — Unix ms host crossed finish line (0 if not done)
+├── guest_finished_ms INTEGER — Unix ms guest crossed finish line (0 if not done)
+├── winner_id         STRING  — conclusive winner userId (written once)
+└── persisted_to_db   STRING  — "1" once the RaceResult Prisma write succeeds
+```
+
+**TTL Policy:** `EXPIRE race:{roomId} 3600` — rooms auto-evict after 1 hour.
+
+> [!NOTE]
+> All values returned by `HGETALL` are **strings**. Callers must explicitly cast integers (`parseInt(...)`) and booleans (`=== "1"`). See the `parseRaceData` helper in Section D.
+
+---
+
+### State Machine
+
+```
+                           Guest joins
+WAITING_FOR_GUEST ──────────────────────► LOBBY_FULL
+                                              │
+                              Both players    │  Player 2 never Readies
+                              click "Ready"   │  → AUTO_ABANDON (TTL-based)
+                                              ▼
+                                          READY_CHECK
+                                              │
+                              Both ready=1    │
+                                              ▼
+                                          COUNTDOWN
+                                    (target_start_ms set)
+                                              │
+                              target_start_ms reached
+                                              ▼
+                                          IN_PROGRESS
+                                              │
+                              First/both players finish
+                                              ▼
+                                           FINISHED
+```
+
+| Transition | Trigger | Actor |
+|---|---|---|
+| `WAITING_FOR_GUEST → LOBBY_FULL` | Guest POSTs `/race/join` | Server |
+| `LOBBY_FULL → READY_CHECK` | Both set `ready=1` via `/race/ready` | Server |
+| `READY_CHECK → COUNTDOWN` | Host POSTs `/race/start`; server sets `target_start_ms` | Server |
+| `COUNTDOWN → IN_PROGRESS` | First `/race/sync` call where `now >= target_start_ms` | Server |
+| `IN_PROGRESS → FINISHED` | A player submits 100% progress | Server |
+
+> [!IMPORTANT]
+> State transitions are guarded by Redis `WATCH` / Lua scripts to prevent race conditions. No client can skip a state.
+
+---
+
+## B. Heartbeat & Ghosting Logic
+
+### Mechanism: `last_active` Timestamp
+
+Every `/api/race/sync` (the "Pulse") writes `host_last_active` or `guest_last_active` to the current server time. Since polling is every **2 s**, a **5-second threshold** (2–3 missed polls) is the disconnect signal.
+
+```
+DISCONNECT_TIMEOUT_MS = 5000
+```
+
+### Server-Side Detection (checked on every /sync call)
+
+```typescript
+const now = Date.now(); // resolved from redis.time() in production
+const opponentLastActive = parseInt(raceData.guest_last_active ?? "0");
+
+if (now - opponentLastActive > DISCONNECT_TIMEOUT_MS && state === "IN_PROGRESS") {
+  // Mark opponent as disconnected
+  await redis.hset(`race:${roomId}`, {
+    state: "FINISHED",
+    winner_id: currentPlayerId, // caller wins by forfeit
+  });
+}
+```
+
+### Client-Side Ghost Rendering
+
+The opponent's `progress` value returned in each `/sync` response drives a CSS transform:
+
+```css
+.ghost-car {
+  left: calc(var(--opponent-progress) * 1%);
+  transition: left 2s linear; /* smooths the 2s polling jumps */
+}
+```
+
+The `transition: left 2s linear` exactly matches the polling interval, so the ghost appears to move continuously between data points.
+
+### What Clients Display on Disconnect
+
+If the calling player's own `last_active` hasn't been updated (i.e. the tab went to background and polling stopped), the **server** will also eventually time them out. From the *opponent's* perspective, the ghost car stops moving and a "Opponent disconnected" overlay appears when their `/sync` response includes `winner_id`.
+
+---
+
+## C. The Sync Protocol — Server-Clock Offset
+
+### Problem
+Client system clocks can drift or be manually altered. The server must own the countdown.
+
+### Solution: `targetStartTime` + Client Offset
+
+#### Step 1 — Host triggers start: `POST /api/race/start`
+
+```typescript
+// Server-side
+const [serverSec, serverMicros] = await redis.time(); // Upstash redis.time()
+const serverNowMs = serverSec * 1000 + Math.floor(serverMicros / 1000);
+const COUNTDOWN_DURATION_MS = 10_000;
+const targetStartMs = serverNowMs + COUNTDOWN_DURATION_MS;
+
+await redis.hset(`race:${roomId}`, {
+  state: "COUNTDOWN",
+  target_start_ms: targetStartMs,
+});
+```
+
+#### Step 2 — Server response includes server's current time
+
+Every `/sync` response includes two fields:
+
+```json
+{
+  "serverNowMs": 1742553158000,
+  "targetStartMs": 1742553168000,
+  "state": "COUNTDOWN",
+  ...
+}
+```
+
+#### Step 3 — Client calculates its local offset
+
+```typescript
+// Recomputed on EVERY /sync response (not just the first)
+const clockOffsetMs = serverNowMs - Date.now(); // can be negative
+
+// Each local tick:
+const adjustedNow = Date.now() + clockOffsetMs;
+const msRemaining = targetStartMs - adjustedNow;
+```
+
+This means **even if the user sets their clock back 5 minutes**, `clockOffsetMs` corrects for it on every poll. The countdown displayed is always relative to the server's real elapsed time.
+
+#### Step 4 — Transition to IN_PROGRESS
+
+```typescript
+// Server checks on every /sync:
+if (state === "COUNTDOWN" && serverNowMs >= targetStartMs) {
+  await redis.hset(`race:${roomId}`, { state: "IN_PROGRESS" });
+}
+```
+
+Clients independently flip to active input mode based on **TrueTime**, not on the Redis `state` field:
+
+```typescript
+// CLIENT — do NOT gate on raceData.state === "IN_PROGRESS"
+// Gate directly on adjusted time, the Redis state is a lagging indicator
+const adjustedNow = Date.now() + clockOffsetMs;
+const raceIsLive = adjustedNow >= targetStartMs;
+
+if (raceIsLive) {
+  enableInput(); // always safe — server rejects pre-start keystrokes anyway
+}
+```
+
+> [!IMPORTANT]
+> **First-Sync Loophole fix:** If neither player polls for several seconds after `targetStartMs` elapses, Redis state stays `COUNTDOWN` but time is already running. The client must enable input as soon as `adjustedNow >= targetStartMs`, regardless of what the Redis `state` field says. The server will confirm `IN_PROGRESS` on the very next `/sync`.
+
+---
+
+## D. API Contract Specifications
+
+### `POST /api/race/create`
+
+**Purpose:** Host creates a new room and initializes Redis state.
+
+**Auth:** Required (session token).
+
+**Request Body:**
+```json
+{
+  "promptId": "prompt_abc123"
+}
+```
+
+**Server Logic:**
+1. Generate `roomId = nanoid(10)`.
+2. Fetch `promptText` from Prisma by `promptId`.
+3. Get server time via `redis.time()`.
+4. Atomically `HSET race:{roomId}` with all fields, `state = "WAITING_FOR_GUEST"`, `host_id = userId`.
+5. Set `EXPIRE race:{roomId} 3600`.
+6. Return `{ roomId, shareCode }`.
+
+**Response:**
+```json
+{
+  "roomId": "xK9mL2pQrT",
+  "shareCode": "xK9mL2pQrT",
+  "state": "WAITING_FOR_GUEST"
+}
+```
+
+---
+
+### `PATCH /api/race/join`
+
+**Purpose:** Guest joins an existing room.
+
+**Auth:** Required.
+
+**Request Body:**
+```json
+{
+  "roomId": "xK9mL2pQrT"
+}
+```
+
+**Concurrency Guard (preventing 3rd players):**
+
+Use a Redis Lua script to make the check-and-set atomic:
+
+```lua
+-- Lua script executed atomically on Redis
+local key = KEYS[1]
+local guestId = ARGV[1]
+local state = redis.call('HGET', key, 'state')
+local existingGuest = redis.call('HGET', key, 'guest_id')
+
+if state ~= 'WAITING_FOR_GUEST' then
+  return redis.error_reply('ROOM_NOT_AVAILABLE')
+end
+if existingGuest and existingGuest ~= '' then
+  return redis.error_reply('ROOM_FULL')
+end
+
+redis.call('HSET', key, 'guest_id', guestId, 'state', 'LOBBY_FULL')
+return 'OK'
+```
+
+This eliminates the TOCTOU window where two guests could join simultaneously.
+
+**Response (success):**
+```json
+{
+  "roomId": "xK9mL2pQrT",
+  "state": "LOBBY_FULL",
+  "promptText": "The quick brown fox..."
+}
+```
+
+**Response (failure):**
+```json
+{ "error": "ROOM_FULL" }  // HTTP 409
+```
+
+---
+
+### `POST /api/race/sync` — The Pulse
+
+**Purpose:** Single round-trip that writes player progress AND reads opponent progress and full game state.
+
+**Auth:** Required. `userId` is extracted from the session.
+
+**Request Body:**
+```json
+{
+  "roomId": "xK9mL2pQrT",
+  "progress": 47,
+  "wpm": 82
+}
+```
+
+**`parseRaceData` Helper — Fix for HGETALL String Types:**
+
+All `HGETALL` values arrive as strings. Centralise casting here to avoid `0 + 1 = "01"` bugs:
+
+```typescript
+function parseRaceData(raw: Record<string, string>) {
+  return {
+    ...raw,
+    // booleans stored as "0" | "1"
+    host_ready:         raw.host_ready === "1",
+    guest_ready:        raw.guest_ready === "1",
+    persisted_to_db:    raw.persisted_to_db === "1",
+    // integers
+    host_progress:      parseInt(raw.host_progress  ?? "0"),
+    guest_progress:     parseInt(raw.guest_progress ?? "0"),
+    host_wpm:           parseInt(raw.host_wpm       ?? "0"),
+    guest_wpm:          parseInt(raw.guest_wpm      ?? "0"),
+    host_last_active:   parseInt(raw.host_last_active  ?? "0"),
+    guest_last_active:  parseInt(raw.guest_last_active ?? "0"),
+    host_finished_ms:   parseInt(raw.host_finished_ms  ?? "0"),
+    guest_finished_ms:  parseInt(raw.guest_finished_ms ?? "0"),
+    target_start_ms:    parseInt(raw.target_start_ms   ?? "0"),
+    ready_deadline_ms:  parseInt(raw.ready_deadline_ms ?? "0"),
+  };
+}
+```
+
+**Server Logic (single atomic pipeline):**
+
+```typescript
+export async function POST(req: Request) {
+  const { roomId, progress, wpm } = await req.json();
+  const userId = getSessionUserId(req);
+
+  const key = `race:${roomId}`;
+
+  // 1. Determine if caller is host or guest
+  const [hostId, guestId] = await redis.hmget(key, "host_id", "guest_id");
+  const isHost = userId === hostId;
+  const role = isHost ? "host" : "guest";
+  const opponentRole = isHost ? "guest" : "host";
+
+  // 2. Get server time (authoritative)
+  const [sec, micros] = await redis.time();
+  const serverNowMs = sec * 1000 + Math.floor(micros / 1000);
+
+  // 3. Write own progress + last_active; read entire hash in one pipeline
+  const pipeline = redis.pipeline();
+  pipeline.hset(key, {
+    [`${role}_progress`]: progress,
+    [`${role}_wpm`]: wpm,
+    [`${role}_last_active`]: serverNowMs,
+  });
+  pipeline.hgetall(key);
+  const [, rawData] = await pipeline.exec();
+  const raceData = parseRaceData(rawData as Record<string, string>);
+
+  // 4. Heartbeat disconnect detection
+  if (
+    raceData.state === "IN_PROGRESS" &&
+    serverNowMs - raceData[`${opponentRole}_last_active` as keyof typeof raceData] as number > DISCONNECT_TIMEOUT_MS
+  ) {
+    await redis.hset(key, { state: "FINISHED", winner_id: userId });
+    raceData.state = "FINISHED";
+    raceData.winner_id = userId;
+  }
+
+  // 5. Check if COUNTDOWN has elapsed (server-side guard)
+  // Note: clients may already be running based on TrueTime; server confirms here
+  if (raceData.state === "COUNTDOWN" && serverNowMs >= raceData.target_start_ms) {
+    await redis.hset(key, { state: "IN_PROGRESS" });
+    raceData.state = "IN_PROGRESS";
+  }
+
+  // 6. Check finish condition
+  if (raceData.state === "IN_PROGRESS" && progress >= 100 && !raceData[`${role}_finished_ms`]) {
+    await redis.hset(key, { [`${role}_finished_ms`]: serverNowMs });
+    (raceData as Record<string, unknown>)[`${role}_finished_ms`] = serverNowMs;
+    // Winner resolution runs here — see Section E
+  }
+
+  // 7. Build response
+  return Response.json({
+    state: raceData.state,
+    serverNowMs,
+    targetStartMs: raceData.target_start_ms,
+    myProgress: progress,
+    opponentProgress: raceData[`${opponentRole}_progress` as keyof typeof raceData],
+    opponentWpm: raceData[`${opponentRole}_wpm` as keyof typeof raceData],
+    winnerId: raceData.winner_id ?? null,
+  });
+}
+```
+
+> [!NOTE]
+> The single `pipeline.exec()` call keeps write + read to **one network round-trip** to Upstash, minimizing latency on the free tier.
+
+---
+
+## E. Conflict Resolution — True Winner Determination
+
+### Scenario: Both players finish within the same 2-second polling window
+
+Because polling is asynchronous, two `/sync` calls with `progress = 100` can arrive within milliseconds of each other. The winner is determined by **server-recorded finish time**, not by who called the API first.
+
+```typescript
+// Called when state === "IN_PROGRESS" && progress >= 100
+async function resolveWinner(key: string, role: string, serverNowMs: number, raceData: Record<string, string>) {
+  const myFinishedKey = `${role}_finished_ms`;
+  const opponentRole = role === "host" ? "guest" : "host";
+  const opponentFinishedKey = `${opponentRole}_finished_ms`;
+
+  // Atomically set my finish time only if not already set
+  const luaSetFinish = `
+    local existing = redis.call('HGET', KEYS[1], ARGV[1])
+    if existing == false or existing == '' then
+      redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+      return 1
+    end
+    return 0
+  `;
+  await redis.eval(luaSetFinish, [key], [myFinishedKey, serverNowMs.toString()]);
+
+  // Re-fetch both finish times
+  const [myMs, opponentMs] = await redis.hmget(key, myFinishedKey, opponentFinishedKey);
+
+  const myTime = parseInt(myMs ?? "0");
+  const oppTime = parseInt(opponentMs ?? "0");
+
+  let winnerId: string;
+
+  if (myTime > 0 && oppTime > 0) {
+    // Both finished — compare server timestamps
+    const myId = raceData[`${role}_id`] ?? raceData.host_id;
+    const oppId = raceData[`${opponentRole}_id`] ?? raceData.guest_id;
+    winnerId = myTime <= oppTime ? myId : oppId;
+    await redis.hset(key, { state: "FINISHED", winner_id: winnerId });
+
+    // ── Dual-Write Guard ─────────────────────────────────────────────────────
+    // Use a Lua CAS to flip persisted_to_db "0" → "1" atomically.
+    // Only the first caller executes the Prisma write; the second gets 0 back.
+    const luaPersist = `
+      local v = redis.call('HGET', KEYS[1], 'persisted_to_db')
+      if v == '1' then return 0 end
+      redis.call('HSET', KEYS[1], 'persisted_to_db', '1')
+      return 1
+    `;
+    const shouldPersist = await redis.eval(luaPersist, [key], []);
+    if (shouldPersist === 1) {
+      // Safe to write — we won the race
+      try {
+        await persistRaceResult(key, raceData, winnerId);
+      } catch (err) {
+        // Roll back the flag so the next /sync call can retry
+        await redis.hset(key, { persisted_to_db: "0" });
+        console.error("Prisma write failed, will retry on next poll", err);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+  }
+  // If only one has finished, state remains IN_PROGRESS for opponent to finish
+}
+```
+
+**Tie-break rule:** The player whose `finished_ms` is numerically smaller wins. Since this is the server's `redis.time()`, it is immune to client clock manipulation.
+
+---
+
+## F. Edge Case Handling
+
+### Edge Case 1 — Guest joins but never clicks "Ready"
+
+**Problem:** `state = LOBBY_FULL`, `guest_ready = 0`. Game is stalled.
+
+**Solution: Ready-Check Timeout**
+
+- When the room transitions to `LOBBY_FULL`, server sets `ready_deadline_ms = serverNowMs + 60_000` (1 minute).
+- Each `/sync` or `/ready` call checks: if `serverNowMs > ready_deadline_ms && guest_ready == 0`:
+  - Transition state → `ABANDONED`.
+  - Client polling receives `state: "ABANDONED"`, shows "Opponent failed to ready up" UI.
+  - Host is redirected to lobby with no penalty.
+
+```typescript
+if (state === "LOBBY_FULL" && serverNowMs > parseInt(raceData.ready_deadline_ms ?? "0")) {
+  await redis.hset(key, { state: "ABANDONED" });
+}
+```
+
+---
+
+### Edge Case 2 — Host's "Start" request arrives at Redis after Guest's poll has already read `COUNTDOWN`
+
+**Problem:** Race condition ordering — guest polls and sees `state = READY_CHECK`, then host's `/race/start` writes `state = COUNTDOWN` with `target_start_ms`. The guest's next poll (2 s later) will catch up.
+
+**Why this is safe:** The `target_start_ms` is set to `serverNowMs + 10,000`. Even if the guest's poll arrives 2 seconds after the start was triggered, they receive `targetStartMs` with ~8 seconds remaining. The client computes `clockOffsetMs` fresh on this response and syncs correctly.
+
+**Guarantee:** No client will ever miss the countdown because:
+1. The countdown window is 10 s — much longer than the 2 s polling interval.
+2. The client re-derives `msRemaining` from server time on every poll.
+
+---
+
+### Edge Case 3 — Clock Drift (user manually changes local machine time during race)
+
+**Problem:** User sets their clock back 10 minutes mid-race to extend their perceived countdown.
+
+**Why the design is immune:**
+
+```typescript
+// Recalculated on EVERY /sync response
+const clockOffsetMs = serverNowMs - Date.now();
+const adjustedNow = Date.now() + clockOffsetMs;
+const msRemaining = targetStartMs - adjustedNow;
+```
+
+If the user sets their clock back, `Date.now()` decreases, so `clockOffsetMs` becomes a larger positive number, and `adjustedNow` remains approximately the same. The displayed countdown stays correct.
+
+**Server-side enforcement:** Even if a client sends keystrokes during a manipulated countdown, the server rejects progress updates when `state !== "IN_PROGRESS"`. The authoritative transition to `IN_PROGRESS` only happens when `redis.time() >= targetStartMs`.
+
+---
+
+## G. Complete Flow Diagram
+
+```
+HOST                        SERVER (Redis)                    GUEST
+ │                               │                               │
+ │── POST /race/create ──────────►│  state=WAITING_FOR_GUEST     │
+ │◄─ { roomId } ─────────────────│                               │
+ │                               │◄─── PATCH /race/join ─────────│
+ │                               │  state=LOBBY_FULL             │
+ │                               │──── { promptText } ──────────►│
+ │── POST /race/ready ───────────►│  host_ready=1                │
+ │                               │◄─── POST /race/ready ─────────│
+ │                               │  guest_ready=1                │
+ │                               │  state=READY_CHECK             │
+ │── POST /race/start ───────────►│  state=COUNTDOWN              │
+ │                               │  target_start_ms=now+10000    │
+ │◄── poll /race/sync ───────────│  returns serverNowMs          │
+ │  (clockOffset computed)       │◄─── poll /race/sync ──────────│
+ │                               │                               │
+ │  [10s countdown elapses]      │                               │
+ │                               │  state=IN_PROGRESS            │
+ │── POST /race/sync (prog=47) ──►│  writes host_progress=47     │
+ │◄── { oppProgress=52 } ────────│  reads guest_progress=52      │
+ │                               │◄─── POST /race/sync (p=52) ───│
+ │                               │◄─── POST /race/sync (p=100) ──│
+ │                               │  guest_finished_ms=T1         │
+ │── POST /race/sync (prog=100) ─►│  host_finished_ms=T2         │
+ │                               │  T1<T2 → winner=guest_id      │
+ │◄── { winnerId: guest_id } ────│──── { winnerId: guest_id } ──►│
+ │                               │  state=FINISHED               │
+ │                               │  → Prisma write (RaceResult)  │
+```
+
+---
+
+## H. Adaptive Polling Strategy (Free-Tier Budget)
+
+Upstash free tier = **10,000 requests/day**. With 2 players polling every 2 s for 60 s, each race costs **60 requests**. Cap: ~166 races/day before throttling.
+
+**Solution: State-Gated Poll Interval**
+
+```typescript
+// Client-side polling hook
+function getPollInterval(state: RaceState): number {
+  switch (state) {
+    case "WAITING_FOR_GUEST":
+    case "LOBBY_FULL":
+      return 5_000; // 5 s — lobby states, nothing time-critical
+    case "READY_CHECK":
+      return 3_000; // 3 s — slightly tighter, waiting for both readies
+    case "COUNTDOWN":
+    case "IN_PROGRESS":
+      return 2_000; // 2 s — race is live, minimum latency
+    default:
+      return 10_000; // FINISHED / ABANDONED — slow polling until redirect
+  }
+}
+```
+
+**Revised Budget per Race:**
+
+| Phase | Duration | Interval | Requests (2 players) |
+|---|---|---|---|
+| Lobby / Ready | ~30 s | 5 s | 12 |
+| Countdown | 10 s | 2 s | 10 |
+| In Progress | ~60 s | 2 s | 60 |
+| **Total** | | | **~82 requests** |
+
+This extends the free-tier cap to **~243 races/day** — a ~46% improvement with no UX regression.
+
+---
+
+## I. Summary of Design Decisions
+
+| Decision | Rationale |
+|---|---|
+| Redis Hash per room | Single key lookup; atomic HSET for all fields |
+| Lua scripts for join & finish | Eliminates TOCTOU race conditions without distributed locks |
+| `redis.time()` for server clock | Unaffected by host OS clock drift; atomic with Redis ops |
+| `parseRaceData()` helper | Centralised casting prevents `parseInt` bugs on HGETALL strings |
+| `persisted_to_db` Lua CAS flag | Ensures exactly-once Prisma write; rollback on failure |
+| Client TrueTime gate (not Redis state) | Prevents lost racing seconds if first poll is delayed |
+| Adaptive poll interval by state | ~46% fewer Upstash requests vs. fixed 2 s polling |
+| 2 s poll + CSS `transition 2s linear` | Simulates smooth ghost movement at zero WebSocket cost |
+| `clockOffsetMs` recalculated each poll | Corrects for in-flight clock drift continuously |
+| `finished_ms` timestamps for winner | Fair, tamper-proof tiebreaker within same poll window |
+| TTL = 3600 s | Free-tier memory bounded; stale rooms self-evict |
+| Disconnect threshold = 5 s (2–3 missed polls) | Balances false positives vs. real disconnects |

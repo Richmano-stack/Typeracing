@@ -25,6 +25,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  console.log(`[SYSTEM] Booting in ${process.env.NODE_ENV} mode.`);
+  
   return (
     <html lang="en">
       <body
