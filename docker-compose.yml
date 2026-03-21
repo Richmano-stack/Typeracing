@@ -37,6 +37,19 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
 
+  upstash-proxy:
+    image: hiett/serverless-redis-http:latest
+    container_name: upstash-proxy-dev
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local_dev
+      SRH_CONNECTION_STRING: redis://redis:6379
+    depends_on:
+      - redis
+
 volumes:
   postgres_dev_data:
   postgres_test_data:

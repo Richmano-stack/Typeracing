@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "check:redis": "dotenv -e .env.local -- tsx scripts/check-redis.ts",
     "test": "dotenv -e .env.test -- prisma db push --accept-data-loss && vitest run"
   },
   "prisma": {
@@ -28,7 +29,6 @@
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.5.5",
     "clsx": "^2.1.1",
-    "ioredis": "^5.10.0",
     "lucide-react": "^0.553.0",
     "next": "^16.0.7",
     "pg": "^8.16.3",

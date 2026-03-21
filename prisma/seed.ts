@@ -257,6 +257,8 @@ const passages = [
 async function main() {
     console.log('Seeding text passages...');
 
+    // Clear dependent tables first to avoid ForeignKeyConstraintViolations
+    await prisma.raceResult.deleteMany();
     // Clear existing passages to ensure it's idempotent
     await prisma.textPassage.deleteMany();
 
