@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "check:redis": "dotenv -e .env.local -- tsx scripts/check-redis.ts",
-    "test": "dotenv -e .env.test -- prisma db push --accept-data-loss && vitest run"
+    "test:qa": "dotenv -e .env.local -- tsx scripts/qa-room-lifecycle.ts",
+    "test": "dotenv -e .env.test -- prisma db push --accept-data-loss && vitest run && pnpm test:qa"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
