@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { LUA_SCRIPTS } from "@/lib/multiplayer/lua";
 import { parseRaceData } from "@/lib/multiplayer/parser";
 import { getServerTimeMs } from "@/lib/multiplayer/server-time";
+import { handleMultiplayerPersistence } from "@/lib/multiplayer/persistence";
 import redis from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,9 @@ export async function POST(req: Request) {
       await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [userId]);
       raceData.state = "FINISHED";
       raceData.winner_id = userId;
+
+      // Atomic persistence trigger
+      await handleMultiplayerPersistence(roomId, raceData);
     }
 
     // 4. Transition to IN_PROGRESS if COUNTDOWN elapsed
@@ -98,7 +102,10 @@ export async function POST(req: Request) {
            await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [winnerId!]);
            raceData.state = "FINISHED";
            raceData.winner_id = winnerId!;
-         }
+
+            // Atomic persistence trigger
+            await handleMultiplayerPersistence(roomId, raceData);
+          }
       }
     }
 
