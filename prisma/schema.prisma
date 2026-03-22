@@ -80,6 +80,10 @@ model RaceResult {
   textPassage      TextPassage  @relation(fields: [text_id], references: [id])
   completedAt      DateTime     @default(now())
 
+  // Multiplayer-Specific Context
+  opponentId       String?
+  winnerId         String?
+
   @@index([userId, completedAt(sort: Desc)])
   @@index([mode, wpm(sort: Desc)])
   @@map("race_results")

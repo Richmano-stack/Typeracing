@@ -14,6 +14,12 @@ export async function POST(req: Request) {
     }
 
     const roomKey = `race:${roomId}`;
+    
+    // 0. Existence Check
+    const exists = await redis.exists(roomKey);
+    if (!exists) {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
 
     const result = await redis.eval(
       LUA_SCRIPTS.READY_UP,
