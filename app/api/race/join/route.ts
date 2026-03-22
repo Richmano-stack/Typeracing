@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { LUA_SCRIPTS } from "@/lib/multiplayer/lua";
 import { parseRaceData } from "@/lib/multiplayer/parser";
+import { getServerTimeMs } from "@/lib/multiplayer/server-time";
 import redis from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +23,15 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
+    const nowMs = await getServerTimeMs();
+
     // Execute the JOIN_ROOM Lua script natively.
     const luaResult = await redis.eval(
       LUA_SCRIPTS.JOIN_ROOM,
       [roomKey],
-      [guestId]
+      [guestId, nowMs.toString()]
     ) as string;
+
 
     if (luaResult === 'ERROR_STATE') {
       return NextResponse.json({ error: "Room is not in a joinable state" }, { status: 400 });

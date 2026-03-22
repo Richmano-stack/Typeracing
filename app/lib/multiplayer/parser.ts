@@ -15,8 +15,14 @@ export function parseRaceData(raw: Record<string, string>): RaceData {
     guest_progress: parseInt(raw.guest_progress || "0"),
     host_wpm: parseInt(raw.host_wpm || "0"),
     guest_wpm: parseInt(raw.guest_wpm || "0"),
-    host_last_active: parseInt(raw.host_last_active || "0"),
-    guest_last_active: parseInt(raw.guest_last_active || "0"),
+    host_last_active: parseInt(raw.host_last_active    || "0"),
+    guest_last_active: parseInt(raw.guest_last_active   || "0"),
+    host_finished_ms: parseInt(raw.host_finished_ms    || "0"),
+    guest_finished_ms: parseInt(raw.guest_finished_ms   || "0"),
+    ready_deadline_ms: parseInt(raw.ready_deadline_ms   || "0"),
     winner_id: raw.winner_id || null,
   };
 }
+
+
+

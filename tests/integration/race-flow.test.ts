@@ -10,11 +10,11 @@ import * as authRoute from "@/api/auth/[...auth]/route";
 describe("Solo Race Lifecycle", () => {
     let testTextId = "";
     const activeRaceIds: string[] = [];
-    
+
     const TEST_EMAIL = `test+raceflow+${Date.now()}@typeracing.test`;
     const TEST_PASSWORD = "TestPassword123!";
     const TEST_NAME = "RaceFlow Tester";
-    
+
     beforeAll(async () => {
         expect(process.env.DATABASE_URL).toContain("test");
         await redis.ping();
@@ -43,7 +43,7 @@ describe("Solo Race Lifecycle", () => {
         if (testKeys.length > 0) {
             await redis.del(...testKeys);
         }
-        
+
         for (const raceId of activeRaceIds) {
             await redis.del(`race:${raceId}`);
         }
@@ -102,10 +102,10 @@ describe("Solo Race Lifecycle", () => {
                         totalCharactersInserted: expectedLength
                     })
                 });
-                
+
                 expect(res.status).toBe(200);
                 const data = await res.json();
-                
+
                 expect(typeof data.wpm).toBe("number");
                 expect(typeof data.accuracy).toBe("number");
                 // Expected `saved` behavior (false for guests)
@@ -123,7 +123,7 @@ describe("Solo Race Lifecycle", () => {
             where: { userId: null },
             orderBy: { completedAt: "desc" }
         });
-        
+
         // Ensure the latest null-user result is either non-existent or older than our test window
         if (latestResult) {
             const now = new Date();
@@ -154,7 +154,7 @@ describe("Solo Race Lifecycle", () => {
                     }),
                 });
                 expect(res.status).toBe(200);
-                
+
                 const raw = res.headers.get("set-cookie") ?? "";
                 sessionCookie = raw
                     .split(",")
@@ -165,7 +165,7 @@ describe("Solo Race Lifecycle", () => {
         expect(sessionCookie).not.toBe("");
 
         // Find the created user
-        const authUser = await prisma.user.findUnique({ where: { email: TEST_EMAIL }});
+        const authUser = await prisma.user.findUnique({ where: { email: TEST_EMAIL } });
         expect(authUser).not.toBeNull();
 
         // --- EXECUTING RACE LIFECYCLE ---
@@ -208,21 +208,21 @@ describe("Solo Race Lifecycle", () => {
                 const res = await fetch({
                     method: "POST",
                     // Crucial: Injecting the cookie header!
-                    headers: { 
+                    headers: {
                         "Content-Type": "application/json",
-                        "Cookie": sessionCookie 
+                        "Cookie": sessionCookie
                     },
                     body: JSON.stringify({
                         raceId: currentRaceId,
                         totalCharactersInserted: expectedLength
                     })
                 });
-                
+
                 expect(res.status).toBe(200);
                 const data = await res.json();
                 expect(data.saved).toBe(true); // Verification
                 expect(data.authenticated).toBe(true);
-                
+
                 finalWpm = data.wpm;
             }
         });
@@ -234,13 +234,13 @@ describe("Solo Race Lifecycle", () => {
         const latestResult = await prisma.raceResult.findFirst({
             orderBy: { completedAt: "desc" }
         });
-        
+
         expect(latestResult).toBeDefined();
         expect(latestResult?.userId).toBe(authUser!.id);
-        expect(latestResult?.wpm).toBeCloseTo(finalWpm, 2); 
+        expect(latestResult?.wpm).toBeCloseTo(finalWpm, 2);
 
         // --- STATS SYNC VERIFICATION ---
-        const updatedUser = await prisma.user.findUnique({ where: { id: authUser!.id }});
+        const updatedUser = await prisma.user.findUnique({ where: { id: authUser!.id } });
         expect(updatedUser!.total_races).toBe(1);
         expect(updatedUser!.best_wpm).toBeCloseTo(finalWpm, 2);
 
@@ -248,7 +248,7 @@ describe("Solo Race Lifecycle", () => {
         const existsAfterFinish = await redis.exists(`race:${currentRaceId}`);
         expect(existsAfterFinish).toBe(0);
     });
-    
+
     describe("Solo Race Edge Cases & Robustness", () => {
         it("should reject races that are too fast (bot detection)", async () => {
             let raceId = "";
@@ -291,7 +291,7 @@ describe("Solo Race Lifecycle", () => {
                             totalCharactersInserted: expectedLength
                         })
                     });
-                    
+
                     expect(res.status).toBe(400);
                     const data = await res.json();
                     expect(data.error).toBe("Impossible speed/Bot detection");
@@ -341,7 +341,7 @@ describe("Solo Race Lifecycle", () => {
                             totalCharactersInserted: expectedLength - 1 // One char missing
                         })
                     });
-                    
+
                     expect(res.status).toBe(400);
                     const data = await res.json();
                     expect(data.error).toBe("User didn't finish the text");
@@ -379,7 +379,7 @@ describe("Solo Race Lifecycle", () => {
                             totalCharactersInserted: expectedLength
                         })
                     });
-                    
+
                     expect(res.status).toBe(400);
                     expect((await res.json()).error).toBe("Race was never started");
                 }
@@ -500,7 +500,7 @@ describe("Solo Race Lifecycle", () => {
 
         it("should return 404 for non-existent race session", async () => {
             const fakeRaceId = "00000000-0000-0000-0000-000000000000";
-            
+
             await testApiHandler({
                 appHandler: startRoute,
                 url: "/api/race/start",
@@ -521,9 +521,9 @@ describe("Solo Race Lifecycle", () => {
                     const res = await fetch({
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ 
-                            raceId: fakeRaceId, 
-                            totalCharactersInserted: 10 
+                        body: JSON.stringify({
+                            raceId: fakeRaceId,
+                            totalCharactersInserted: 10
                         })
                     });
                     expect(res.status).toBe(404);
