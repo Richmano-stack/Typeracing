@@ -55,6 +55,8 @@ export async function handleMultiplayerPersistence(roomId: string, raceData: Rac
           ? Math.round((p.finishedAt - raceData.target_start_ms) / 1000)
           : 0;
 
+        const opponentId = p.role === "host" ? raceData.guest_id : raceData.host_id;
+
         // Save RaceResult
         await tx.raceResult.create({
           data: {
@@ -64,6 +66,8 @@ export async function handleMultiplayerPersistence(roomId: string, raceData: Rac
             accuracy: 100, // Default for now, or calculate if we have total chars
             duration_seconds: Math.max(0, durationSeconds),
             text_id: raceData.prompt_id,
+            opponentId: opponentId,
+            winnerId: raceData.winner_id,
           }
         });
 
