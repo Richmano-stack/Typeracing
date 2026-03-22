@@ -77,7 +77,7 @@ export const LUA_SCRIPTS = {
     local field = ARGV[1]
     local time = ARGV[2]
     local existing = redis.call('HGET', key, field)
-    if existing == false or existing == '' then
+    if existing == false or existing == '' or existing == '0' then
       redis.call('HSET', key, field, time)
       return 1
     end

@@ -59,7 +59,6 @@ export async function POST(req: Request) {
     }
 
     // 3. Heartbeat Disconnect Detection
-
     const opponentLastActive = raceData[`${opponentRole}_last_active` as keyof typeof raceData] as number;
     if (
       raceData.state === "IN_PROGRESS" &&
@@ -89,34 +88,51 @@ export async function POST(req: Request) {
          // Use SET_FINISH to record timestamp atomically
          await redis.eval(LUA_SCRIPTS.SET_FINISH, [roomKey], [field, serverNowMs.toString()]);
          
-         // Re-read finish times to check if both are done
-          const raceDataFin = (await redis.hmget(roomKey, "host_finished_ms", "guest_finished_ms") as any) || {};
-          const hostFin = raceDataFin.host_finished_ms || "0";
-          const guestFin = raceDataFin.guest_finished_ms || "0";
-         const hFin = parseInt(hostFin || "0");
-         const gFin = parseInt(guestFin || "0");
-         
-         if (hFin > 0 && gFin > 0) {
-           // Both finished, resolve winner based on server time
-           const winnerId = hFin <= gFin ? raceData.host_id : raceData.guest_id;
-           await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [winnerId!]);
-           raceData.state = "FINISHED";
-           raceData.winner_id = winnerId!;
+         // RE-FETCH: Absorb concurrent updates (Split-Brain Mitigation)
+         const updatedRawData = await redis.hgetall(roomKey) as Record<string, string>;
+         const updatedRaceData = parseRaceData(updatedRawData);
 
-            // Atomic persistence trigger
-            await handleMultiplayerPersistence(roomId, raceData);
-          }
+         // 1. If a winner already exists (set by a concurrent pulse), update local state
+         if (updatedRaceData.winner_id) {
+           raceData.state = "FINISHED";
+           raceData.winner_id = updatedRaceData.winner_id;
+         } else {
+           // 2. Otherwise, check if both have finished and resolve if so
+           const hFin = parseInt(updatedRawData.host_finished_ms || "0");
+           const gFin = parseInt(updatedRawData.guest_finished_ms || "0");
+           
+           if (hFin > 0 && gFin > 0) {
+             const winnerId = hFin <= gFin ? raceData.host_id : raceData.guest_id;
+             await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [winnerId!]);
+             raceData.state = "FINISHED";
+             raceData.winner_id = winnerId!;
+
+             // Atomic persistence trigger
+             await handleMultiplayerPersistence(roomId, raceData);
+           }
+         }
       }
     }
 
     // 6. Return Pulse Response
+    let finalWinnerId = raceData.winner_id;
+    let finalState = raceData.state;
+
+    // Safety Net: One last check for winner_id to satisfy stress tests
+    if (!finalWinnerId) {
+      finalWinnerId = await redis.hget(roomKey, "winner_id") as string | null;
+      if (finalWinnerId) {
+        finalState = "FINISHED";
+      }
+    }
+
     return NextResponse.json({
-      state: raceData.state,
+      state: finalState,
       serverNowMs,
       targetStartMs: raceData.target_start_ms,
       opponentProgress: raceData[`${opponentRole}_progress` as keyof typeof raceData],
       opponentWpm: raceData[`${opponentRole}_wpm` as keyof typeof raceData],
-      winnerId: raceData.winner_id || null,
+      winnerId: finalWinnerId || null,
     }, { status: 200 });
 
   } catch (error) {
