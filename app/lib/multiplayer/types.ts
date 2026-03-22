@@ -15,6 +15,11 @@ export interface RaceData {
   guest_wpm: number;
   host_last_active: number;
   guest_last_active: number;
+  host_finished_ms: number;
+  guest_finished_ms: number;
+  ready_deadline_ms: number;
   winner_id: string | null;
   persisted_to_db: boolean;
 }
+
+

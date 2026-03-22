@@ -35,9 +35,14 @@ export async function POST(req: Request) {
         const redisKey = `race:${raceId}`;
 
         // 2. Fetch from Redis
+        const exists = await redis.exists(redisKey);
+        if (!exists) {
+            return NextResponse.json({ error: "Race expired or not found" }, { status: 404 });
+        }
+
         const raceData = await redis.hgetall<RaceData>(redisKey);
         
-        // If it doesn't exist, return 404
+        // Final sanity check
         if (!raceData || Object.keys(raceData).length === 0) {
             return NextResponse.json({ error: "Race expired or not found" }, { status: 404 });
         }
