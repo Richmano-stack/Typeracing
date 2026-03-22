@@ -1,5 +1,5 @@
 import { testApiHandler } from "next-test-api-route-handler";
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import redis from "@/lib/redis";
 import * as initiateRoute from "@/api/race/initiate/route";
@@ -28,6 +28,10 @@ describe("Solo Race Lifecycle", () => {
             }
         });
         testTextId = testText.id;
+    });
+
+    beforeEach(async () => {
+        await redis.flushdb();
     });
 
     afterAll(async () => {
@@ -62,6 +66,9 @@ describe("Solo Race Lifecycle", () => {
             url: "/api/race/initiate",
             async test({ fetch }) {
                 const res = await fetch({ method: "POST" });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
                 expect(res.status).toBe(200);
                 const data = await res.json();
                 currentRaceId = data.raceId;
@@ -83,6 +90,9 @@ describe("Solo Race Lifecycle", () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ raceId: currentRaceId })
                 });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
                 expect(res.status).toBe(200);
             }
         });
@@ -103,6 +113,9 @@ describe("Solo Race Lifecycle", () => {
                     })
                 });
 
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
                 expect(res.status).toBe(200);
                 const data = await res.json();
 
@@ -153,6 +166,9 @@ describe("Solo Race Lifecycle", () => {
                         name: TEST_NAME,
                     }),
                 });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
                 expect(res.status).toBe(200);
 
                 const raw = res.headers.get("set-cookie") ?? "";
@@ -189,11 +205,15 @@ describe("Solo Race Lifecycle", () => {
             appHandler: startRoute,
             url: "/api/race/start",
             async test({ fetch }) {
-                await fetch({
+                const res = await fetch({
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ raceId: currentRaceId })
                 });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
+                expect(res.status).toBe(200);
             }
         });
 
@@ -218,6 +238,9 @@ describe("Solo Race Lifecycle", () => {
                     })
                 });
 
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
                 expect(res.status).toBe(200);
                 const data = await res.json();
                 expect(data.saved).toBe(true); // Verification
@@ -270,11 +293,15 @@ describe("Solo Race Lifecycle", () => {
                 appHandler: startRoute,
                 url: "/api/race/start",
                 async test({ fetch }) {
-                    await fetch({
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ raceId })
-                    });
+                const res = await fetch({
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ raceId })
+                });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
+                expect(res.status).toBe(200);
                 }
             });
 
@@ -319,11 +346,15 @@ describe("Solo Race Lifecycle", () => {
                 appHandler: startRoute,
                 url: "/api/race/start",
                 async test({ fetch }) {
-                    await fetch({
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ raceId })
-                    });
+                const res = await fetch({
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ raceId })
+                });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
+                expect(res.status).toBe(200);
                 }
             });
 
@@ -406,11 +437,15 @@ describe("Solo Race Lifecycle", () => {
                 appHandler: startRoute,
                 url: "/api/race/start",
                 async test({ fetch }) {
-                    await fetch({
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ raceId })
-                    });
+                const res = await fetch({
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ raceId })
+                });
+                if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
+                expect(res.status).toBe(200);
                 }
             });
 
@@ -429,7 +464,10 @@ describe("Solo Race Lifecycle", () => {
                             totalCharactersInserted: expectedLength
                         })
                     });
-                    expect(res.status).toBe(200);
+                    if (res.status !== 200) {
+                    console.error("API Error Response Body:", await res.json());
+                }
+                expect(res.status).toBe(200);
                 }
             });
 
@@ -476,6 +514,10 @@ describe("Solo Race Lifecycle", () => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ raceId })
                     });
+                    if (res.status !== 200) {
+                        console.error("API Error Response Body:", await res.json());
+                    }
+                    expect(res.status).toBe(200);
                     time1 = (await res.json()).startTime;
                 }
             });
@@ -492,6 +534,10 @@ describe("Solo Race Lifecycle", () => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ raceId })
                     });
+                    if (res.status !== 200) {
+                        console.error("API Error Response Body:", await res.json());
+                    }
+                    expect(res.status).toBe(200);
                     const time2 = (await res.json()).startTime;
                     expect(time1).toBe(time2);
                 }
