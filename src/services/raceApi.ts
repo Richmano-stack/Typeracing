@@ -64,5 +64,73 @@ export const raceApi = {
         }
 
         return response.json();
+    },
+
+    async ready(roomId: string, userId: string): Promise<{ roomId: string; room: any }> {
+        const response = await fetch("/api/race/ready", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ roomId, userId }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to ready up: ${response.statusText} - ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+    async startMultiplayer(roomId: string, userId: string): Promise<{ roomId: string; room: any }> {
+        const response = await fetch("/api/race/start", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ roomId, userId }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to start multiplayer race: ${response.statusText} - ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+async reset(roomId: string, userId: string): Promise<{ success: boolean; message: string }> {
+        const response = await fetch("/api/race/reset", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ roomId, userId }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to reset room: ${response.statusText} - ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+    async create(promptId?: string, promptText?: string): Promise<{ roomId: string; hostId: string; room: any }> {
+        const response = await fetch("/api/race/create", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ promptId, promptText }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to create race: ${response.statusText} - ${errorText}`);
+        }
+
+        return response.json();
     }
 };

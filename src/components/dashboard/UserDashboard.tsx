@@ -1,10 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Swords, Zap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Swords, Zap, Loader2 } from 'lucide-react';
 import CyberButton from '@/components/ui/CyberButton';
 import { User } from '@prisma/client';
+import { raceApi } from '@/services/raceApi';
+import { toast } from 'sonner';
 
 interface UserDashboardProps {
     user: User & {
@@ -28,6 +31,23 @@ interface UserDashboardProps {
 }
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces }) => {
+    const router = useRouter();
+    const [isCreating, setIsCreating] = useState(false);
+
+    const handleCreatePrivateLobby = async () => {
+        try {
+            setIsCreating(true);
+            const { roomId } = await raceApi.create();
+            toast.success("Private Protocol Initialized");
+            router.push(`/race/${roomId}`);
+        } catch (error) {
+            console.error(error);
+            toast.error("Handshake Failed. Try again.");
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
     return (
         <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-6xl mx-auto space-y-6">
@@ -49,15 +69,26 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                                 <span>Solo Protocol</span>
                             </CyberButton>
                         </Link>
-                        <Link href="#">
-                            <CyberButton variant="secondary" size="lg" className="opacity-50 cursor-not-allowed">
+                        
+                        <CyberButton 
+                            variant="secondary" 
+                            size="lg" 
+                            onClick={handleCreatePrivateLobby}
+                            disabled={isCreating}
+                            className={isCreating ? "opacity-80" : ""}
+                        >
+                            {isCreating ? (
+                                <Loader2 size={20} className="animate-spin" />
+                            ) : (
                                 <Swords size={20} />
-                                <span className="flex items-center">
-                                    Private Lobby
-                                    <span className="ml-2 text-[10px] bg-[rgba(0,243,255,0.1)] px-1 rounded border border-[var(--primary)] text-[var(--primary)] font-mono tracking-tighter">(COMING_SOON)</span>
-                                </span>
-                            </CyberButton>
-                        </Link>
+                            )}
+                            <span className="flex items-center">
+                                {isCreating ? "Initializing..." : "Private Lobby"}
+                                {!isCreating && (
+                                    <span className="ml-2 text-[10px] bg-[rgba(0,243,255,0.1)] px-1 rounded border border-[var(--primary)] text-[var(--primary)] font-mono tracking-tighter">(READY)</span>
+                                )}
+                            </span>
+                        </CyberButton>
                     </div>
                 </div>
 

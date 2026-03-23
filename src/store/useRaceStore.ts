@@ -22,11 +22,29 @@ export interface RaceState {
 
   // Result State
   winnerId: string | null;
+  finalResults: {
+    wpm: number;
+    accuracy: number;
+    durationMs: number;
+    saved: boolean;
+    authenticated: boolean;
+  } | null;
+
+  // Readiness State
+  hostReady: boolean;
+  guestReady: boolean;
+
+  // New Metrics (Sprint 1)
+  rawKeystrokes: number;
+  validKeystrokes: number;
+  isHardSync: boolean;
+  isInputDisabled: boolean;
 }
 
 export interface RaceActions {
   setGameState: (data: Partial<RaceState>) => void;
   updateLocalProgress: (progress: number, wpm: number) => void;
+  updateMetrics: (raw: number, valid: number, wpm: number, progress: number) => void;
   resetStore: () => void;
 }
 
@@ -48,6 +66,15 @@ const initialState: RaceState = {
   opponentLastActive: null,
 
   winnerId: null,
+  finalResults: null,
+
+  hostReady: false,
+  guestReady: false,
+
+  rawKeystrokes: 0,
+  validKeystrokes: 0,
+  isHardSync: false,
+  isInputDisabled: false,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({
@@ -59,6 +86,18 @@ export const useRaceStore = create<RaceStore>((set) => ({
     set((state) => {
       const isFinished = progress >= 100;
       return {
+        localProgress: progress,
+        localWpm: wpm,
+        localFinished: state.localFinished || isFinished,
+      };
+    }),
+
+  updateMetrics: (raw, valid, wpm, progress) =>
+    set((state) => {
+      const isFinished = progress >= 100;
+      return {
+        rawKeystrokes: raw,
+        validKeystrokes: valid,
         localProgress: progress,
         localWpm: wpm,
         localFinished: state.localFinished || isFinished,
