@@ -1,0 +1,143 @@
+# High-Level Design: Multiplayer Duel Typing Game Frontend
+
+This document specifies the frontend architecture for the "Deceptive" Real-Time Multiplayer Typing Game. The primary goal is to provide a smooth, 60fps racing experience despite a 500ms server authoritative heartbeat.
+
+---
+
+## 1. State Management Architecture (Dual-Track)
+
+To achieve smoothness while maintaining authoritative correctness, the system splits state into two logical tracks.
+
+### Track A: Functional State (Auth Facts)
+Managed via a lightweight state store (e.g., **Zustand** or **React Context**).
+- **Update Frequency**: ~500ms (on every successful `/api/race/sync` pulse).
+- **Contents**: `winnerId`, `rawOpponentProgress`, `serverState` (COUNTDOWN, IN_PROGRESS, etc.), `targetStartMs`.
+- **Responsibility**: Provides the "Ground Truth" for game logic and modal triggers.
+
+### Track B: Visual State (Interpolation)
+Managed via a high-frequency loop (e.g., `requestAnimationFrame` or **Framer Motion** `useSpring`).
+- **Update Frequency**: ~16.6ms (60fps).
+- **Interpolation Logic (LERP)**:
+  We use Linear Interpolation to glide the "Ghost Car" between the previous and new authoritative progress.
+  
+  ```typescript
+  // LERP Step calculation
+  const lerp = (start: number, end: number, factor: number) => {
+    return start + (end - start) * factor;
+  };
+  
+  // Usage in GhostCar component
+  // 'visualProgress' approaches 'rawOpponentProgress' over 500ms
+  const smoothedProgress = useSpring(rawOpponentProgress, { stiffness: 50, damping: 20 });
+  ```
+- **Velocity Estimation**: Since we know the heartbeat is 500ms, we can predict movement:
+  `velocity = (newProgress - oldProgress) / 500;`
+  The Ghost Car continues moving at `velocity` even if a pulse is slightly delayed, preventing "stutter."
+
+---
+
+## 2. Component Hierarchy
+
+### `RaceProvider` (The "Brain")
+- **Responsibility**: State container and orchestration.
+- **Logic**: Initializes the `useRaceSync` hook. Distributes state via Context to sub-components.
+
+### `GameBoard` (The Track)
+- **Responsibility**: Visual layout.
+- **Logic**: Renders the background track, progress markers, and the two cars (Player and Opponent).
+
+### `TypeInput` (Local Engine)
+- **Responsibility**: Ultra-fast input handling.
+- **Logic**: 
+  - Uses `useRef` for the input value to avoid re-rendering the whole tree on every keystroke.
+  - Updates **Local Progress** state only when a word or character completion threshold is hit.
+  - Calculates local WPM in real-time.
+
+### `GhostCar` (The Interpolation Engine)
+- **Responsibility**: Smoothly renders the opponent.
+- **Logic**: Consumes `rawOpponentProgress` and applies the Visual State interpolation techniques.
+
+### `ResultModal` (Authoritative End)
+- **Responsibility**: Show game outcome.
+- **Logic**: Triggered strictly by `state === 'FINISHED'` and `winnerId` from the server.
+
+---
+
+## 3. The Polling Hook (`useRaceSync`)
+
+A custom hook that handles the communication with `/api/race/sync`.
+
+### Implementation Details:
+- **Interval**: 500ms using `setInterval` (or a recursive `setTimeout` to handle network jitter).
+- **Tab Backgrounding**: Subscribes to `document.visibilityState`. If `"hidden"`, it clears the interval to save battery/bandwidth. Re-polls on `"visible"`.
+- **Clock Synchronization**:
+  ```typescript
+  // Clock Offset Calculation
+  const clockOffsetMs = serverNowMs - Date.now();
+  const adjustedLocalTime = () => Date.now() + clockOffsetMs;
+  ```
+  This `adjustedLocalTime` is used for the `COUNTDOWN` state to ensure both players see "GO!" at the exact same moment.
+
+---
+
+## 4. Error Handling & UI SLAs
+
+### HTTP Error Mapping
+| Code | Backend Meaning | UI Action |
+|------|-----------------|-----------|
+| **404** | Room expired/not found | Redirect to `/lobby` with "Room Expired" Toast. |
+| **403** | Unauthorized / Session Invalid | Redirect to `/login`. |
+| **409** | Concurrent Conflict | Silently retry next pulse or show "Sync Conflict" warning. |
+| **500** | Server Crash | Show "Reconnecting..." overlay; retry backoff. |
+
+### Stalemate Detection
+- **Logic**: If `opponent_last_active` is not updated for > 2 seconds:
+  - UI shows a "Waiting for Opponent..." indicator near the Ghost Car.
+  - If it exceeds 5 seconds, the server will transition to `FINISHED` (Winner: You), which the UI will naturally pick up on the next successful poll.
+
+---
+
+## 5. Performance & Optimization
+
+### Re-render Prevention
+- **Typing Input**: The `TypeInput` component should be memoized. Use `useCallback` for the `onChange` handler.
+- **Store Selection**: Use selectors in Zustand/Context (e.g., `useRaceStore(s => s.opponentProgress)`) to ensure `GameBoard` doesn't re-render when only `localWpm` changes.
+
+### Code Splitting
+- **Dynamic Imports**: Use `next/dynamic` to lazy-load the `GameBoard` and `RaceProvider`.
+  ```typescript
+  const GameEngine = dynamic(() => import('@/components/game/GameEngine'), {
+    ssr: false,
+    loading: () => <Skeleton className="h-64 w-full" />
+  });
+  ```
+  Only load the engine when the `roomId` is present in the URL or the user clicks "Join".
+
+---
+
+## 6. Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant TypeInput
+    participant useRaceSync
+    participant Store
+    participant GhostCar
+    participant Server
+
+    User->>TypeInput: Keystroke
+    TypeInput->>Store: Update Local Progress (Immediate)
+    
+    loop Every 500ms
+        useRaceSync->>Server: POST /sync (Progress, WPM)
+        Server-->>useRaceSync: 200 OK (Auth State, Opponent Progress)
+        useRaceSync->>Store: Update Auth Fact (Track A)
+    end
+
+    loop Every 16ms (RAF)
+        GhostCar->>Store: Read Auth Fact
+        GhostCar->>GhostCar: Compute LERP Position (Track B)
+        GhostCar->>GhostCar: Render Smooth Frame
+    end
+```

@@ -2,8 +2,8 @@ import { testApiHandler } from "next-test-api-route-handler";
 import { vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import * as syncRoute from "@/api/race/sync/route";
-import * as rehydrateRoute from "@/api/race/[roomId]/route";
+import * as syncRoute from "@/app/api/race/sync/route";
+import * as rehydrateRoute from "@/app/api/race/[roomId]/route";
 import { RaceData } from "@/lib/multiplayer/types";
 
 vi.mock("@/lib/redis", async (importOriginal) => {
