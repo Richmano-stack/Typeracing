@@ -16,6 +16,7 @@ export const GhostCar = React.memo(function GhostCar({ opponentName = 'Opponent'
   const opponentLastActive = useRaceStore((s) => s.opponentLastActive);
   const state = useRaceStore((s) => s.state);
   const clockOffsetMs = useRaceStore((s) => s.clockOffsetMs) || 0;
+  const isHardSync = useRaceStore((s) => s.isHardSync);
 
   // Motion value for the raw target progress
   const progressTarget = useMotionValue(opponentProgress);
@@ -27,7 +28,7 @@ export const GhostCar = React.memo(function GhostCar({ opponentName = 'Opponent'
   });
 
   // Map progress (0-100) to left percentage
-  const leftPos = useTransform(smoothProgress, [0, 100], ['0%', '100%']);
+  const leftPos = useTransform(isHardSync ? progressTarget : smoothProgress, [0, 100], ['0%', '100%']);
 
   // Update target when the store receives a new sync
   useEffect(() => {
@@ -38,7 +39,7 @@ export const GhostCar = React.memo(function GhostCar({ opponentName = 'Opponent'
   const [isLagging, setIsLagging] = useState(false);
 
   useEffect(() => {
-    if (state !== 'IN_PROGRESS') {
+    if (state !== 'IN_PROGRESS' || isHardSync) {
       setIsLagging(false);
       return;
     }

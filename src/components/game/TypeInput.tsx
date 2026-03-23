@@ -17,7 +17,12 @@ export function TypeInput({ promptText }: TypeInputProps) {
   const wordIndex = useRef<number>(0);
 
   const state = useRaceStore((s) => s.state);
-  const updateLocalProgress = useRaceStore((s) => s.updateLocalProgress);
+  const isInputDisabled = useRaceStore((s) => s.isInputDisabled);
+  const updateMetrics = useRaceStore((s) => s.updateMetrics);
+
+  const rawKeystrokes = useRef<number>(0);
+  const validKeystrokes = useRef<number>(0);
+  const lastDispatchTime = useRef<number>(0);
 
   useEffect(() => {
     if (state === 'IN_PROGRESS') {
@@ -35,10 +40,31 @@ export function TypeInput({ promptText }: TypeInputProps) {
          startTime.current = null;
          lastReportedProgress.current = 0;
          wordIndex.current = 0;
+         rawKeystrokes.current = 0;
+         validKeystrokes.current = 0;
+         lastDispatchTime.current = 0;
          setTimeout(handleInput, 0); // Reset UI
       }
     }
   }, [state]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (state !== 'IN_PROGRESS' || isInputDisabled) return;
+
+    // Filter for "Meaningful Keystrokes"
+    // Include: Any key where event.key.length === 1 (alphanumeric, symbols, space)
+    // Exclude: Backspace, Enter, Tab, Escape, and all Modifier keys
+    if (e.key.length === 1) {
+      rawKeystrokes.current++;
+
+      const currentPos = inputRef.current?.value.length || 0;
+      const expectedChar = promptText[currentPos];
+
+      if (e.key === expectedChar) {
+        validKeystrokes.current++;
+      }
+    }
+  };
 
   const handleInput = () => {
     const value = inputRef.current?.value || '';
@@ -104,22 +130,28 @@ export function TypeInput({ promptText }: TypeInputProps) {
     }
 
     // WPM & Progress Logic
-    if (state !== 'IN_PROGRESS') return;
+    if (state !== 'IN_PROGRESS' || isInputDisabled) return;
     if (!startTime.current) startTime.current = Date.now();
     
     const progress = (value.length / promptText.length) * 100;
     const elapsedMinutes = (Date.now() - startTime.current) / 60000;
     const wpm = elapsedMinutes > 0 ? (correctCount / 5) / elapsedMinutes : 0;
 
-    // Throttle store updates (e.g., every 1% progress or word complete or finished)
-    // This avoids bombarding Zustand on every character keypress
+    // Throttle store updates: dispatch when a word is completed or every 2 seconds or finished
+    const now = Date.now();
     const isWordComplete = value[value.length - 1] === ' ';
-    const isSignificantProgress = Math.abs(progress - lastReportedProgress.current) >= 1;
     const isFinished = value.length === promptText.length;
+    const isTwoSecondsPassed = now - lastDispatchTime.current >= 2000;
 
-    if (isWordComplete || isSignificantProgress || isFinished) {
-        updateLocalProgress(Number(progress.toFixed(2)), Math.round(wpm));
+    if (isWordComplete || isFinished || isTwoSecondsPassed) {
+        updateMetrics(
+            rawKeystrokes.current,
+            validKeystrokes.current,
+            Math.round(wpm),
+            Number(progress.toFixed(2))
+        );
         lastReportedProgress.current = progress;
+        lastDispatchTime.current = now;
     }
   };
 
@@ -140,7 +172,8 @@ export function TypeInput({ promptText }: TypeInputProps) {
         type="text"
         className="absolute inset-0 w-full h-full opacity-0 cursor-text -z-10 focus:z-10"
         onInput={handleInput}
-        disabled={state !== 'IN_PROGRESS'}
+        onKeyDown={handleKeyDown}
+        disabled={state !== 'IN_PROGRESS' || isInputDisabled}
         autoCapitalize="none"
         autoComplete="off"
         autoCorrect="off"
@@ -180,9 +213,11 @@ export function TypeInput({ promptText }: TypeInputProps) {
             <span className="text-neutral-300 font-medium tracking-wide">Waiting for players to ready up...</span>
          </div>
       )}
-      {state === 'FINISHED' && (
-         <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20 transition-all">
-            <span className="text-emerald-400 text-xl font-medium tracking-wide">Race Complete!</span>
+      {(state === 'FINISHED' || state === 'ABANDONED' || isInputDisabled) && state !== 'LOBBY' && (
+         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-20 transition-all">
+            <span className={`text-xl font-black uppercase tracking-widest ${state === 'ABANDONED' ? 'text-rose-500' : 'text-emerald-400'}`}>
+                {state === 'ABANDONED' ? 'RACE ABANDONED' : 'SYSTEM LOCKED'}
+            </span>
          </div>
       )}
     </div>
