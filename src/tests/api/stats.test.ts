@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { testApiHandler } from "next-test-api-route-handler";
-import * as statsRoute from "@/api/user/stats/route";
+import * as statsRoute from "@/app/api/user/stats/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 

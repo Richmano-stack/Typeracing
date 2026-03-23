@@ -1,6 +1,6 @@
 import { testApiHandler } from "next-test-api-route-handler";
 import { afterAll, describe, expect, it } from "vitest";
-import * as authRoute from "@/api/auth/[...auth]/route";
+import * as authRoute from "@/app/api/auth/[...auth]/route";
 import { prisma } from "@/lib/prisma";
 
 const TEST_EMAIL = `test+integration+${Date.now()}@typeracing.test`;
