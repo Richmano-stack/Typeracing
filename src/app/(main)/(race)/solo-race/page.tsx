@@ -280,6 +280,7 @@ const SoloRacePage: React.FC = () => {
                 isLoading={isDecrypting}
                 results={results}
                 onReset={handleReset}
+                isWinner={true}
             />
         </div>
     );

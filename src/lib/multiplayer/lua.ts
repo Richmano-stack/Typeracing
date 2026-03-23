@@ -98,6 +98,82 @@ export const LUA_SCRIPTS = {
     local winnerId = ARGV[1]
     redis.call('HSET', key, 'state', 'FINISHED', 'winner_id', winnerId)
     return 'OK'
+  `,
+
+  // Atomic Sync: Updates progress AND checks for finish/winner in one go
+  SYNC_PROGRESS: `
+    local key = KEYS[1]
+    local userId = ARGV[1]
+    local progress = tonumber(ARGV[2])
+    local wpm = tonumber(ARGV[3])
+    local nowMs = ARGV[4]
+    
+    local hostId = redis.call('HGET', key, 'host_id')
+    local guestId = redis.call('HGET', key, 'guest_id')
+    
+    local role = nil
+    if userId == hostId then role = 'host' end
+    if userId == guestId then role = 'guest' end
+    if role == nil then return 'ERROR_UNAUTHORIZED' end
+    
+    -- 1. Update basic fields
+    redis.call('HSET', key, role .. '_progress', tostring(progress), role .. '_wpm', tostring(wpm), role .. '_last_active', nowMs)
+    
+    -- 2. Handle Finish Timestamp
+    local finishedField = role .. '_finished_ms'
+    local existingFinished = redis.call('HGET', key, finishedField)
+    if progress >= 100 and (existingFinished == false or existingFinished == '' or existingFinished == '0') then
+      redis.call('HSET', key, finishedField, nowMs)
+    end
+    
+    -- 3. Check for transitions
+    local state = redis.call('HGET', key, 'state')
+    
+    -- 3.1 Ready Deadline Check
+    if state == 'LOBBY_FULL' then
+      local deadline = tonumber(redis.call('HGET', key, 'ready_deadline_ms') or '0')
+      if deadline > 0 and tonumber(nowMs) > deadline then
+        local guestReady = redis.call('HGET', key, 'guest_ready')
+        if guestReady ~= '1' then
+          state = 'ABANDONED'
+          redis.call('HSET', key, 'state', state)
+        end
+      end
+    end
+
+    -- 3.2 Countdown -> In Progress
+    local targetStartMs = tonumber(redis.call('HGET', key, 'target_start_ms') or '0')
+    if state == 'COUNTDOWN' and tonumber(nowMs) >= targetStartMs then
+      state = 'IN_PROGRESS'
+      redis.call('HSET', key, 'state', state)
+    end
+    
+    -- 4. In-Game Logic (Disconnects & Winner Resolution)
+    if state == 'IN_PROGRESS' then
+      -- A. Heartbeat Disconnect Detection
+      local opponentRole = (role == 'host') and 'guest' or 'host'
+      local opponentLastActive = tonumber(redis.call('HGET', key, opponentRole .. '_last_active') or '0')
+      if opponentLastActive > 0 and (tonumber(nowMs) - opponentLastActive > 5000) then
+         redis.call('HSET', key, 'state', 'FINISHED', 'winner_id', userId)
+         state = 'FINISHED'
+      end
+
+      -- B. Regular Winner Resolution (Both Finished)
+      if state == 'IN_PROGRESS' then
+        local hFin = tonumber(redis.call('HGET', key, 'host_finished_ms') or '0')
+        local gFin = tonumber(redis.call('HGET', key, 'guest_finished_ms') or '0')
+        local existingWinner = redis.call('HGET', key, 'winner_id')
+        
+        if hFin > 0 and gFin > 0 and (existingWinner == false or existingWinner == '') then
+          local winnerId = hostId
+          if gFin < hFin then winnerId = guestId end
+          redis.call('HSET', key, 'state', 'FINISHED', 'winner_id', winnerId)
+        end
+      end
+    end
+    
+    -- Return everything needed back to the app
+    return redis.call('HGETALL', key)
   `
 };
 

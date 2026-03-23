@@ -9,6 +9,7 @@ import { authClient } from "@/lib/auth-client";
 export const PlayerCar = React.memo(function PlayerCar() {
   const localProgress = useRaceStore((s) => s.localProgress);
   const state = useRaceStore((s) => s.state);
+  const isHardSync = useRaceStore((s) => s.isHardSync);
   const { data: session } = authClient.useSession();
 
   const playerName = session?.user?.name || session?.user?.email?.split('@')[0] || 'You';
@@ -19,7 +20,7 @@ export const PlayerCar = React.memo(function PlayerCar() {
     damping: 20,
   });
 
-  const leftPos = useTransform(smoothProgress, [0, 100], ['0%', '100%']);
+  const leftPos = useTransform(isHardSync ? progressTarget : smoothProgress, [0, 100], ['0%', '100%']);
 
   useEffect(() => {
     progressTarget.set(localProgress);

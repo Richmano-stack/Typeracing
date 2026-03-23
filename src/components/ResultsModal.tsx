@@ -1,21 +1,38 @@
 "use client";
 
 import React from 'react';
-import { Trophy, BarChart3, RefreshCw, UserPlus, ExternalLink, Loader2, AlertTriangle, Zap } from 'lucide-react';
+import { Trophy, BarChart3, RefreshCw, UserPlus, ExternalLink, Loader2, AlertTriangle, Zap, Home } from 'lucide-react';
 import { FinishResponse } from '@/services/raceApi';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useRaceStore } from '@/store/useRaceStore';
+import { authClient } from '@/lib/auth-client';
 
 interface ResultsModalProps {
     isOpen: boolean;
     isLoading: boolean;
-    results: FinishResponse | null;
     onReset: () => void;
+    results?: FinishResponse | null;
+    isWinner?: boolean;
 }
 
-const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results, onReset }) => {
-    if (!isOpen) return null;
+const ResultsModal: React.FC<ResultsModalProps> = ({
+    isOpen,
+    isLoading,
+    onReset,
+    results: propResults,
+    isWinner: propIsWinner
+}) => {
+    const { data: session } = authClient.useSession();
+    const userId = session?.user?.id;
+    const { winnerId, finalResults } = useRaceStore();
     const router = useRouter();
+
+    if (!isOpen) return null;
+
+    const results = propResults ?? finalResults;
+    // Note: isWinner and userId are kept for future logic if needed, 
+    // but the style is restored as requested.
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-sm p-4 font-mono">
@@ -27,7 +44,7 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                 {/* Glitch Overlay for background */}
                 <div className="absolute inset-0 pointer-events-none opacity-5 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
 
-                {isLoading ? (
+                {isLoading || !results ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-6">
                         <div className="relative">
                             <Loader2 className="text-[var(--primary)] animate-spin" size={64} />
@@ -46,7 +63,7 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                             }
                         `}</style>
                     </div>
-                ) : results ? (
+                ) : (
                     <>
                         {/* Header */}
                         <header className="mb-10 relative">
@@ -136,10 +153,11 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                             </Link>
                         </div>
                     </>
-                ) : null}
+                )}
             </div>
         </div>
     );
 };
 
 export default ResultsModal;
+

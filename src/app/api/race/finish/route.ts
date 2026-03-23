@@ -17,6 +17,8 @@ interface RaceData {
     [key: string]: string | undefined;
 }
 
+import { getServerTimeMs } from "@/lib/multiplayer/server-time";
+
 export async function POST(req: Request) {
     try {
         const session = await auth.api.getSession({
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
         const textId = raceData.textId;
 
         // 3. Time Calculation
-        const endTime = Date.now();
+        const endTime = await getServerTimeMs();
         const durationMs = endTime - startTime;
 
         // 4. Integrity Check
