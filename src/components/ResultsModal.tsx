@@ -128,8 +128,8 @@ const ResultsModal: React.FC<ResultsModalProps> = ({ isOpen, isLoading, results,
                             >
                                 <RefreshCw size={18} /> Re-Initialize
                             </button>
-                             <Link
-                                href="/dashboard"
+                            <Link
+                                href="/"
                                 className="px-8 py-4 border border-[var(--border)] hover:bg-[var(--bg-primary-hover)] transition-all uppercase tracking-widest text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
                             >
                                 Terminate

@@ -31,12 +31,12 @@ export default function RegisterForm() {
             email: formData.email,
             password: formData.password,
             name: formData.name,
-            callbackURL: "/dashboard",
+            callbackURL: "/",
         }, {
             onRequest: () => setIsLoading(true),
             onSuccess: () => {
                 setIsLoading(false);
-                window.location.href = "/dashboard";
+                window.location.href = "/";
             },
             onError: (ctx) => {
                 setError(ctx.error.message);
