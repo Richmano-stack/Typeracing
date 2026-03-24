@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     const isHost = userId === rawDataInitial.host_id;
     const isGuest = userId === rawDataInitial.guest_id;
-    
+
     if (!isHost && !isGuest) {
       return NextResponse.json({ error: "User not in room" }, { status: 403 });
     }
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     });
     pipeline.hgetall(roomKey);
     const results = await pipeline.exec();
-    
+
     // results[0] is hset result, results[1] is hgetall result
     const rawData = results[1] as Record<string, string>;
     const raceData = parseRaceData(rawData);
@@ -83,34 +83,34 @@ export async function POST(req: Request) {
     if (raceData.state === "IN_PROGRESS" && progress >= 100) {
       const field = `${role}_finished_ms`;
       const alreadyFinished = rawData[field];
-      
+
       if (!alreadyFinished || alreadyFinished === "0") {
-         // Use SET_FINISH to record timestamp atomically
-         await redis.eval(LUA_SCRIPTS.SET_FINISH, [roomKey], [field, serverNowMs.toString()]);
-         
-         // RE-FETCH: Absorb concurrent updates (Split-Brain Mitigation)
-         const updatedRawData = await redis.hgetall(roomKey) as Record<string, string>;
-         const updatedRaceData = parseRaceData(updatedRawData);
+        // Use SET_FINISH to record timestamp atomically
+        await redis.eval(LUA_SCRIPTS.SET_FINISH, [roomKey], [field, serverNowMs.toString()]);
 
-         // 1. If a winner already exists (set by a concurrent pulse), update local state
-         if (updatedRaceData.winner_id) {
-           raceData.state = "FINISHED";
-           raceData.winner_id = updatedRaceData.winner_id;
-         } else {
-           // 2. Otherwise, check if both have finished and resolve if so
-           const hFin = parseInt(updatedRawData.host_finished_ms || "0");
-           const gFin = parseInt(updatedRawData.guest_finished_ms || "0");
-           
-           if (hFin > 0 && gFin > 0) {
-             const winnerId = hFin <= gFin ? raceData.host_id : raceData.guest_id;
-             await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [winnerId!]);
-             raceData.state = "FINISHED";
-             raceData.winner_id = winnerId!;
+        // RE-FETCH: Absorb concurrent updates (Split-Brain Mitigation)
+        const updatedRawData = await redis.hgetall(roomKey) as Record<string, string>;
+        const updatedRaceData = parseRaceData(updatedRawData);
 
-             // Atomic persistence trigger
-             await handleMultiplayerPersistence(roomId, raceData);
-           }
-         }
+        // 1. If a winner already exists (set by a concurrent pulse), update local state
+        if (updatedRaceData.winner_id) {
+          raceData.state = "FINISHED";
+          raceData.winner_id = updatedRaceData.winner_id;
+        } else {
+          // 2. Otherwise, check if both have finished and resolve if so
+          const hFin = parseInt(updatedRawData.host_finished_ms || "0");
+          const gFin = parseInt(updatedRawData.guest_finished_ms || "0");
+
+          if (hFin > 0 && gFin > 0) {
+            const winnerId = hFin <= gFin ? raceData.host_id : raceData.guest_id;
+            await redis.eval(LUA_SCRIPTS.RESOLVE_WINNER, [roomKey], [winnerId!]);
+            raceData.state = "FINISHED";
+            raceData.winner_id = winnerId!;
+
+            // Atomic persistence trigger
+            await handleMultiplayerPersistence(roomId, raceData);
+          }
+        }
       }
     }
 
