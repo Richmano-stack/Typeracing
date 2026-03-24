@@ -31,13 +31,13 @@ export default function LoginForm() {
             const { data, error: loginError } = await authClient.signIn.email({
                 email: formData.email,
                 password: formData.password,
-                callbackURL: "/dashboard",
+                callbackURL: "/",
             });
 
             if (loginError) {
                 setError('Invalid email or password');
             } else {
-                router.push('/dashboard');
+                router.push('/');
                 router.refresh();
             }
         } catch (error) {
@@ -52,7 +52,7 @@ export default function LoginForm() {
         try {
             await authClient.signIn.social({
                 provider,
-                callbackURL: '/dashboard'
+                callbackURL: '/'
             });
         } catch (error) {
             console.error('Login error:', error);
