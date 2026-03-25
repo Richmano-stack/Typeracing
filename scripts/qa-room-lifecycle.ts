@@ -11,7 +11,7 @@ async function runQATests() {
   console.log("🚀 Starting QA Automation Audit for Room Lifecycle...\n");
   
   let roomId = "";
-  const hostPromptText = "This is a custom test prompt for QA.";
+  let hostPromptText = "";
 
   // ==========================================
   // Test A: The Initialization Audit
@@ -19,12 +19,7 @@ async function runQATests() {
   console.log("▶ Test A: The Initialization Audit");
   try {
     const createRes = await fetch(`${API_BASE}/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        promptId: "qa-prompt-1",
-        promptText: hostPromptText
-      })
+      method: "POST"
     });
     
     const createData = await createRes.json();
@@ -46,11 +41,13 @@ async function runQATests() {
       console.log(`  ✅ PASS: Fields correctly typed. host_progress is a number (Value: ${createData.room.host_progress})`);
     }
 
-    if (createData.room.prompt_text !== hostPromptText) {
-      console.log(`  ❌ FAIL: Prompt text mismatch. Expected "${hostPromptText}", got "${createData.room.prompt_text}"`);
+    if (typeof createData.room.prompt_text !== "string" || createData.room.prompt_text.length === 0) {
+      console.log(`  ❌ FAIL: Prompt text is missing or invalid. Got: ${createData.room.prompt_text}`);
       testAPast = false;
     } else {
-      console.log("  ✅ PASS: Prompt text matches what was requested.");
+      console.log("  ✅ PASS: Prompt text is present and valid.");
+      // Save it for Test B
+      hostPromptText = createData.room.prompt_text;
     }
 
   } catch (err: any) {

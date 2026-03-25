@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import * as syncRoute from "@/app/api/race/sync/route";
 import * as rehydrateRoute from "@/app/api/race/[roomId]/route";
+import * as createRoute from "@/app/api/race/create/route";
 import { RaceData } from "@/lib/multiplayer/types";
 
 vi.mock("@/lib/redis", async (importOriginal) => {
@@ -111,6 +112,54 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
         await redis.hset(roomKey, flatData);
         return roomKey;
     }
+
+    describe("Task 0: Room Creation", () => {
+        it("should create a room, fetch a real prompt from DB, and store it in Redis", async () => {
+            let createdRoomId = "";
+
+            await testApiHandler({
+                appHandler: createRoute,
+                url: "/api/race/create",
+                async test({ fetch }) {
+                    const res = await fetch({ method: "POST" });
+                    
+                    expect(res.status).toBe(200);
+                    const data = await res.json();
+                    
+                    expect(data.roomId).toBeDefined();
+                    expect(data.hostId).toBeDefined();
+                    expect(data.room).toBeDefined();
+                    
+                    // Verify it fetched a real prompt from DB
+                    const dbPassage = await prisma.textPassage.findUnique({
+                        where: { id: data.room.prompt_id }
+                    });
+                    
+                    expect(dbPassage).toBeDefined();
+                    expect(dbPassage!.id).toBe(data.room.prompt_id);
+                    expect(dbPassage!.content).toBe(data.room.prompt_text);
+                    expect(data.room.state).toBe("WAITING_FOR_GUEST");
+
+                    createdRoomId = data.roomId;
+                }
+            });
+
+            // Verify it was actually stored in Redis
+            const roomKey = `race:${createdRoomId}`;
+            const exists = await redis.exists(roomKey);
+            expect(exists).toBe(1);
+
+            const storedData = await redis.hgetall(roomKey);
+            expect(storedData.state).toBe("WAITING_FOR_GUEST");
+            expect(storedData.prompt_id).toBeDefined();
+            expect(storedData.prompt_text).toBeDefined();
+            expect(String(storedData.host_progress)).toBe("0");
+            expect(String(storedData.guest_progress)).toBe("0");
+            
+            // Clean up the created room
+            await redis.del(roomKey);
+        });
+    });
 
     describe("Task 1: The 'Split-Brain' Concurrency Stress Test", () => {
         it("should resolve Player A as winner and persist exactly once when 5 pulses attack", async () => {
