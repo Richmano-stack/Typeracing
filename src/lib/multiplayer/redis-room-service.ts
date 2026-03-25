@@ -34,7 +34,6 @@ export async function initialize(params: InitializeParams): Promise<RaceData> {
   const rawData: Record<string, string> = {
     state: "WAITING_FOR_GUEST",
     host_id: hostId,
-    guest_id: "",
     prompt_id: promptId,
     prompt_text: promptText,
     host_ready: "0",
@@ -58,4 +57,40 @@ export async function initialize(params: InitializeParams): Promise<RaceData> {
   await redis.expire(roomKey, ROOM_TTL_SECONDS);
 
   return parseRaceData(rawData);
+}
+
+/**
+ * Fetches an existing race room by ID.
+ *
+ * @returns The parsed RaceData object, or null if the room does not exist.
+ */
+export async function getRoom(roomId: string): Promise<RaceData | null> {
+  const roomKey = `race:${roomId}`;
+  const rawData = await redis.hgetall(roomKey) as Record<string, string>;
+  
+  if (Object.keys(rawData).length === 0) {
+    return null;
+  }
+  
+  return parseRaceData(rawData);
+}
+
+/**
+ * Atomically attempts to join a room using HSETNX.
+ *
+ * @returns true if the spot was claimed, false if the room was already full.
+ */
+export async function join(roomId: string, userId: string): Promise<boolean> {
+  const roomKey = `race:${roomId}`;
+  
+  // HSETNX returns 1 if field was set, 0 if it already existed (was populated)
+  const result = await redis.hsetnx(roomKey, "guest_id", userId);
+  
+  if (result === 1) {
+    // Only if we successfully "claimed" the spot, we update the state
+    await redis.hset(roomKey, { state: "READY_WAIT" });
+    return true;
+  }
+  
+  return false;
 }
