@@ -1,57 +1,45 @@
 import { NextResponse } from "next/server";
 import { getServerTimeMs } from "@/lib/multiplayer/server-time";
-import { parseRaceData } from "@/lib/multiplayer/parser";
-import redis from "@/lib/redis";
+import { getRandomQuote } from "@/lib/multiplayer/content-service";
+import { initialize } from "@/lib/multiplayer/redis-room-service";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
+/**
+ * POST /api/race/create
+ *
+ * Initializes a new multiplayer race lobby.
+ *
+ * 1. Generates a unique roomId and hostId.
+ * 2. Fetches a random prompt from the DB via ContentService.
+ * 3. Writes the initial Redis room hash via RedisRoomService.
+ * 4. Returns { roomId, hostId, room } to the client.
+ *
+ * No request body is required — the server owns prompt selection.
+ */
+export async function POST() {
   try {
-    const body = await req.json();
-    const promptId = body.promptId || "demo-prompt-id";
-    const promptText = body.promptText || "This is a demo typing text to test the multiplayer system.";
-
     const roomId = crypto.randomUUID().slice(0, 8);
-    const hostId = crypto.randomUUID(); // Simulated host session ID
+    const hostId = crypto.randomUUID();
 
+    // Fetch a random prompt from the database
+    const prompt = await getRandomQuote();
+
+    // Get authoritative server time
     const nowMs = await getServerTimeMs();
 
-    const rawData = {
-      state: "WAITING_FOR_GUEST",
-      host_id: hostId,
-      guest_id: "",
-      prompt_id: promptId,
-      prompt_text: promptText,
-      host_ready: "0",
-      guest_ready: "0",
-      target_start_ms: "0",
-      host_progress: "0",
-      guest_progress: "0",
-      host_wpm: "0",
-      guest_wpm: "0",
-      host_last_active: nowMs.toString(),
-      guest_last_active: "0",
-      winner_id: "",
-      persisted_to_db: "0",
-    };
-
-    const roomKey = `race:${roomId}`;
-
-    // Initialize the Redis hash race:{roomId} with all default fields
-    await redis.hset(roomKey, rawData);
-
-    // Set a Redis expiration (TTL) of 3600 seconds to prevent lingering lobbies
-    await redis.expire(roomKey, 3600);
-
-    const parsedData = parseRaceData(rawData);
-
-    console.log(`[Room Created] Room ID: ${roomId}, Host ID: ${hostId}`);
-
-    return NextResponse.json({
+    // Initialize the Redis room hash
+    const room = await initialize({
       roomId,
-      hostId, // Returning hostId so the client knows their identity
-      room: parsedData
-    }, { status: 200 });
+      hostId,
+      promptId: prompt.id,
+      promptText: prompt.content,
+      nowMs,
+    });
+
+    console.log(`[Room Created] Room ID: ${roomId}, Host ID: ${hostId}, Prompt ID: ${prompt.id}`);
+
+    return NextResponse.json({ roomId, hostId, room }, { status: 200 });
 
   } catch (error) {
     console.error("[Room Creation Error]", error);
