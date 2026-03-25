@@ -67,7 +67,7 @@ async function runQATests() {
   const guest1Id = "guest-qa-123";
   try {
     const joinRes = await fetch(`${API_BASE}/join`, {
-      method: "PATCH",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         roomId,
@@ -77,10 +77,10 @@ async function runQATests() {
 
     const joinData = await joinRes.json();
 
-    if (joinData.room.state !== "LOBBY_FULL") {
-      console.log(`  ❌ FAIL: State did not move to LOBBY_FULL. Got: ${joinData.room.state}`);
+    if (joinData.room.state !== "READY_WAIT") {
+      console.log(`  ❌ FAIL: State did not move to READY_WAIT. Got: ${joinData.room.state}`);
     } else {
-      console.log("  ✅ PASS: State successfully moved from WAITING_FOR_GUEST to LOBBY_FULL.");
+      console.log("  ✅ PASS: State successfully moved from WAITING_FOR_GUEST to READY_WAIT.");
     }
 
     if (joinData.room.prompt_text !== hostPromptText) {
@@ -100,7 +100,7 @@ async function runQATests() {
   const guest2Id = "ghost-guest-999";
   try {
     const ghostRes = await fetch(`${API_BASE}/join`, {
-      method: "PATCH",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         roomId,

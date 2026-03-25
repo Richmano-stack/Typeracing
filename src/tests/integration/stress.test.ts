@@ -5,7 +5,9 @@ import { redis } from "@/lib/redis";
 import * as syncRoute from "@/app/api/race/sync/route";
 import * as rehydrateRoute from "@/app/api/race/[roomId]/route";
 import * as createRoute from "@/app/api/race/create/route";
+import * as joinRoute from "@/app/api/race/join/route";
 import { RaceData } from "@/lib/multiplayer/types";
+import { auth } from "@/lib/auth";
 
 vi.mock("@/lib/redis", async (importOriginal) => {
     const original = await importOriginal<any>();
@@ -102,7 +104,7 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
         const flatData: Record<string, string> = {};
         for (const [k, v] of Object.entries(data)) {
             if (v === null) {
-                flatData[k] = "";
+                continue; // Do not write it so HSETNX works
             } else if (typeof v === "boolean") {
                 flatData[k] = v ? "1" : "0";
             } else {
@@ -158,6 +160,66 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
             
             // Clean up the created room
             await redis.del(roomKey);
+        });
+    });
+
+    describe("Task 0.5: The 'Twin Join' Concurrency Test", () => {
+        it("should allow exactly one concurrent joiner when 10 request simultaneously", async () => {
+            const roomKey = await setupRoom({ guest_id: null as any, state: "WAITING_FOR_GUEST" });
+            
+            // Generate 10 mock user IDs
+            const mockUsers = Array.from({ length: 10 }, (_, i) => `concurrent-user-${i}`);
+            
+            // Mock getSession to authorize these users based on a custom header
+            const getSessionSpy = vi.spyOn(auth.api, "getSession").mockImplementation(async ({ headers }) => {
+                const reqHeaders = headers as Headers;
+                const mockUserId = reqHeaders.get("x-mock-user-id");
+                if (mockUserId) {
+                   return { session: {} as any, user: { id: mockUserId } as any };
+                }
+                return null;
+            });
+
+            const results: number[] = [];
+
+            const runJoin = (userId: string) => 
+                testApiHandler({
+                    appHandler: joinRoute,
+                    url: "/api/race/join",
+                    async test({ fetch }) {
+                        const res = await fetch({
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "x-mock-user-id": userId
+                            },
+                            body: JSON.stringify({
+                                roomId: TEST_ROOM_ID,
+                            })
+                        });
+                        results.push(res.status);
+                    }
+                });
+
+            // Fire 10 joins concurrently to force the race condition
+            await Promise.all(mockUsers.map(u => runJoin(u)));
+            console.log("JOIN RESULTS:", results);
+            
+            const successCount = results.filter(status => status === 200).length;
+            const fullCount = results.filter(status => status === 403).length;
+            
+            // Atomicity Expectation: Exactly 1 wins, exactly 9 get 403 Room Full
+            expect(successCount, `Expected 1 success, got ${successCount}. Results: ${results}`).toBe(1);
+            expect(fullCount, `Expected 9 failures, got ${fullCount}. Results: ${results}`).toBe(9);
+            
+            // Verification Expectation: Redis state reflects the winner uniquely
+            const storedData = await redis.hgetall(roomKey);
+            expect(storedData.guest_id).toBeDefined();
+            expect(storedData.guest_id).not.toBe("");
+            expect(mockUsers).toContain(storedData.guest_id);
+            expect(storedData.state).toBe("READY_WAIT");
+            
+            getSessionSpy.mockRestore();
         });
     });
 
