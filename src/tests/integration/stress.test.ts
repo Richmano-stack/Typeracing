@@ -217,7 +217,7 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
             expect(storedData.guest_id).toBeDefined();
             expect(storedData.guest_id).not.toBe("");
             expect(mockUsers).toContain(storedData.guest_id);
-            expect(storedData.state).toBe("READY_WAIT");
+            expect(storedData.state).toBe("LOBBY_FULL");
             
             getSessionSpy.mockRestore();
         });

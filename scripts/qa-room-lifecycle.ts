@@ -77,10 +77,10 @@ async function runQATests() {
 
     const joinData = await joinRes.json();
 
-    if (joinData.room.state !== "READY_WAIT") {
-      console.log(`  ❌ FAIL: State did not move to READY_WAIT. Got: ${joinData.room.state}`);
+    if (joinData.room.state !== "LOBBY_FULL") {
+      console.log(`  ❌ FAIL: State did not move to LOBBY_FULL. Got: ${joinData.room.state}`);
     } else {
-      console.log("  ✅ PASS: State successfully moved from WAITING_FOR_GUEST to READY_WAIT.");
+      console.log("  ✅ PASS: State successfully moved from WAITING_FOR_GUEST to LOBBY_FULL.");
     }
 
     if (joinData.room.prompt_text !== hostPromptText) {

@@ -1,4 +1,5 @@
 import redis from "@/lib/redis";
+import { LUA_SCRIPTS } from "./lua";
 import { parseRaceData } from "./parser";
 import { RaceData } from "./types";
 
@@ -76,21 +77,20 @@ export async function getRoom(roomId: string): Promise<RaceData | null> {
 }
 
 /**
- * Atomically attempts to join a room using HSETNX.
+ * Atomically attempts to join a room using the JOIN_ROOM Lua script.
  *
- * @returns true if the spot was claimed, false if the room was already full.
+ * Handles: self-join prevention, idempotent re-entry, state validation, and slot claiming.
+ *
+ * @returns A result string: 'OK' | 'OK_ALREADY_IN' | 'ERROR_FULL' | 'ERROR_STATE' | 'ERROR_SELF_JOIN'
  */
-export async function join(roomId: string, userId: string): Promise<boolean> {
+export async function join(roomId: string, userId: string, nowMs: number): Promise<string> {
   const roomKey = `race:${roomId}`;
   
-  // HSETNX returns 1 if field was set, 0 if it already existed (was populated)
-  const result = await redis.hsetnx(roomKey, "guest_id", userId);
+  const result = await redis.eval(
+    LUA_SCRIPTS.JOIN_ROOM,
+    [roomKey],
+    [userId, nowMs.toString()]
+  ) as string;
   
-  if (result === 1) {
-    // Only if we successfully "claimed" the spot, we update the state
-    await redis.hset(roomKey, { state: "READY_WAIT" });
-    return true;
-  }
-  
-  return false;
+  return result;
 }
