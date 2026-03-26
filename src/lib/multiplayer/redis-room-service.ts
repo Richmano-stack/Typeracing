@@ -67,9 +67,9 @@ export async function initialize(params: InitializeParams): Promise<RaceData> {
  */
 export async function getRoom(roomId: string): Promise<RaceData | null> {
   const roomKey = `race:${roomId}`;
-  const rawData = await redis.hgetall(roomKey) as Record<string, string>;
+  const rawData = await redis.hgetall(roomKey) as Record<string, string> | null;
   
-  if (Object.keys(rawData).length === 0) {
+  if (!rawData || Object.keys(rawData).length === 0) {
     return null;
   }
   
