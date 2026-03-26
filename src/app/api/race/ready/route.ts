@@ -31,6 +31,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not in this room" }, { status: 403 });
     }
 
+    if (result === 'ERROR_STATE') {
+      return NextResponse.json({ error: "Room is not in the ready phase" }, { status: 409 });
+    }
+
     const rawData = await redis.hgetall(roomKey) as Record<string, string>;
     const parsedData = parseRaceData(rawData);
 

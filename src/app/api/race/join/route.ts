@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import * as RedisRoomService from "@/lib/multiplayer/redis-room-service";
+import { getServerTimeMs } from "@/lib/multiplayer/server-time";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +30,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
-    // Atomically attempt to claim the spot
-    const joined = await RedisRoomService.join(roomId, userId);
+    // Get authoritative server time for the Lua script
+    const nowMs = await getServerTimeMs();
 
-    if (!joined) {
+    // Atomically attempt to claim the spot via Lua script
+    const result = await RedisRoomService.join(roomId, userId, nowMs);
+
+    if (result === 'ERROR_SELF_JOIN') {
+      return NextResponse.json({ error: "Host cannot join their own room" }, { status: 400 });
+    }
+
+    if (result === 'ERROR_FULL' || result === 'ERROR_STATE') {
       return NextResponse.json({ error: "Room is already full" }, { status: 403 });
     }
 
-    console.log(`[Room Joined] User ${userId} joined Room ${roomId}`);
+    console.log(`[Room Joined] User ${userId} joined Room ${roomId} (result: ${result})`);
 
     // Fetch the updated room data to return synchronously
     const parsedData = await RedisRoomService.getRoom(roomId);
@@ -52,3 +60,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

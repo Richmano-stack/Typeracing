@@ -5,7 +5,14 @@ export const LUA_SCRIPTS = {
     local guestId = ARGV[1]
     local nowMs = ARGV[2]
     local state = redis.call('HGET', key, 'state')
+    local hostId = redis.call('HGET', key, 'host_id')
     local existingGuest = redis.call('HGET', key, 'guest_id')
+
+    -- Self-join: host cannot be guest
+    if guestId == hostId then return 'ERROR_SELF_JOIN' end
+
+    -- Idempotent re-entry: already the guest? That's fine.
+    if existingGuest == guestId then return 'OK_ALREADY_IN' end
 
     if state ~= 'WAITING_FOR_GUEST' then return 'ERROR_STATE' end
     if existingGuest and existingGuest ~= '' then return 'ERROR_FULL' end
@@ -32,6 +39,9 @@ export const LUA_SCRIPTS = {
   READY_UP: `
     local key = KEYS[1]
     local userId = ARGV[1]
+    
+    local state = redis.call('HGET', key, 'state')
+    if state ~= 'LOBBY_FULL' then return 'ERROR_STATE' end
     
     local hostId = redis.call('HGET', key, 'host_id')
     local guestId = redis.call('HGET', key, 'guest_id')
