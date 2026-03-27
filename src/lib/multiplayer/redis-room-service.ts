@@ -2,6 +2,7 @@ import redis from "@/lib/redis";
 import { LUA_SCRIPTS } from "./lua";
 import { parseRaceData } from "./parser";
 import { RaceData } from "./types";
+import { getServerTimeMs } from "./server-time";
 
 /**
  * RedisRoomService
@@ -93,4 +94,38 @@ export async function join(roomId: string, userId: string, nowMs: number): Promi
   ) as string;
   
   return result;
+}
+
+/**
+ * High-precision multiplayer start logic.
+ * Calculates target start time based on server clock and commits via Lua.
+ * 
+ * @returns { roomId, targetStartMs, serverNowMs } 
+ */
+export async function startMultiplayer(roomId: string, userId: string): Promise<{
+  status: 'OK' | 'ALREADY_STARTING' | 'ERROR_NOT_FOUND' | 'ERROR_FORBIDDEN' | 'ERROR_NO_GUEST' | 'ERROR_NOT_READY' | 'ERROR_STATE',
+  targetStartMs?: number,
+  serverNowMs?: number
+}> {
+  const roomKey = `race:${roomId}`;
+  const serverNowMs = await getServerTimeMs();
+  const COUNTDOWN_OFFSET = 10000; // 10 seconds
+  const targetStartMs = serverNowMs + COUNTDOWN_OFFSET;
+
+  const result = await redis.eval(
+    LUA_SCRIPTS.MULTIPLAYER_START,
+    [roomKey],
+    [userId, targetStartMs.toString()]
+  ) as string;
+
+  if (result === 'OK') {
+    return { status: 'OK', targetStartMs, serverNowMs };
+  }
+
+  if (result.startsWith('ALREADY_STARTING:')) {
+    const existingTarget = parseInt(result.split(':')[1], 10);
+    return { status: 'ALREADY_STARTING', targetStartMs: existingTarget, serverNowMs };
+  }
+
+  return { status: result as any, serverNowMs };
 }

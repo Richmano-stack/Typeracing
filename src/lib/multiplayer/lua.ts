@@ -81,6 +81,43 @@ export const LUA_SCRIPTS = {
     return 'OK'
   `,
 
+  // Transition from READY_CHECK to COUNTDOWN with higher precision and idempotency
+  MULTIPLAYER_START: `
+    local key = KEYS[1]
+    local userId = ARGV[1]
+    local targetStartMs = ARGV[2]
+    
+    local data = redis.call('HMGET', key, 'state', 'host_id', 'guest_id', 'guest_ready', 'target_start_ms')
+    local state = data[1]
+    local hostId = data[2]
+    local guestId = data[3]
+    local guestReady = data[4]
+    local existingTarget = data[5]
+
+    -- 1. Existence Check
+    if not state then return 'ERROR_NOT_FOUND' end
+
+    -- 2. Identity Guard
+    if userId ~= hostId and userId ~= guestId then return 'ERROR_FORBIDDEN' end
+
+    -- 3. Idempotency Guard
+    if state == 'COUNTDOWN' then
+      return 'ALREADY_STARTING:' .. existingTarget
+    end
+
+    -- 4. Readiness Guard
+    if not guestId or guestId == '' then return 'ERROR_NO_GUEST' end
+    if guestReady ~= '1' then return 'ERROR_NOT_READY' end
+    if state ~= 'READY_CHECK' then return 'ERROR_STATE' end
+
+    -- 5. Commit
+    redis.call('HSET', key, 'state', 'COUNTDOWN', 'target_start_ms', targetStartMs)
+    -- Extend TTL to 1 hour from now to ensure it doesn't expire during race
+    redis.call('EXPIRE', key, 3600) 
+    
+    return 'OK'
+  `,
+
   // Atomically set a player's finish time if not already set
   SET_FINISH: `
     local key = KEYS[1]

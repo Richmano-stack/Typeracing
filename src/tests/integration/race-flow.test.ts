@@ -2,9 +2,9 @@ import { testApiHandler } from "next-test-api-route-handler";
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import redis from "@/lib/redis";
-import * as initiateRoute from "@/app/api/race/initiate/route";
-import * as startRoute from "@/app/api/race/start/route";
-import * as finishRoute from "@/app/api/race/finish/route";
+import * as initiateRoute from "@/app/api/race/(solo)/initiate/route";
+import * as startRoute from "@/app/api/race/(shared)/start/route";
+import * as finishRoute from "@/app/api/race/(solo)/finish/route";
 import * as authRoute from "@/app/api/auth/[...auth]/route";
 
 describe("Solo Race Lifecycle", () => {
