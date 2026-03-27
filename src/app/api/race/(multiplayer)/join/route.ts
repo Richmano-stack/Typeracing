@@ -40,8 +40,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Host cannot join their own room" }, { status: 400 });
     }
 
-    if (result === 'ERROR_FULL' || result === 'ERROR_STATE') {
+    if (result === 'ERROR_FULL') {
       return NextResponse.json({ error: "Room is already full" }, { status: 403 });
+    }
+
+    if (result === 'ERROR_STATE') {
+      return NextResponse.json({ error: "Room is not in a joinable state" }, { status: 403 });
+    }
+
+    if (result === 'ERROR_EXPIRED') {
+      return NextResponse.json({ error: "This lobby has expired (5-minute timeout)" }, { status: 410 });
     }
 
     console.log(`[Room Joined] User ${userId} joined Room ${roomId} (result: ${result})`);

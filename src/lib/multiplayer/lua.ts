@@ -14,6 +14,10 @@ export const LUA_SCRIPTS = {
     -- Idempotent re-entry: already the guest? That's fine.
     if existingGuest == guestId then return 'OK_ALREADY_IN' end
 
+    -- Lobby Timeout: Check if room is older than 5 minutes
+    local createdAt = tonumber(redis.call('HGET', key, 'created_at_ms') or '0')
+    if createdAt > 0 and (tonumber(nowMs) - createdAt > 300000) then return 'ERROR_EXPIRED' end
+
     if state ~= 'WAITING_FOR_GUEST' then return 'ERROR_STATE' end
     if existingGuest and existingGuest ~= '' then return 'ERROR_FULL' end
 
@@ -145,6 +149,45 @@ export const LUA_SCRIPTS = {
     local winnerId = ARGV[1]
     redis.call('HSET', key, 'state', 'FINISHED', 'winner_id', winnerId)
     return 'OK'
+  `,
+
+  // Atomically update last_active and check for timeouts
+  LOBBY_HEARTBEAT: `
+    local key = KEYS[1]
+    local userId = ARGV[1]
+    local nowMs = tonumber(ARGV[2])
+    
+    local data = redis.call('HMGET', key, 'state', 'host_id', 'guest_id', 'host_last_active', 'guest_last_active')
+    local state = data[1]
+    local hostId = data[2]
+    local guestId = data[3]
+    local hLA = tonumber(data[4] or '0')
+    local gLA = tonumber(data[5] or '0')
+
+    if not state then return 'ERROR_NOT_FOUND' end
+
+    local role = nil
+    local opponentLastActive = 0
+    if userId == hostId then 
+      role = 'host'
+      opponentLastActive = gLA
+    elseif userId == guestId then 
+      role = 'guest'
+      opponentLastActive = hLA
+    end
+
+    if not role then return 'ERROR_UNAUTHORIZED' end
+
+    -- Update requester last active
+    redis.call('HSET', key, role .. '_last_active', tostring(nowMs))
+
+    -- Abandonment Detection: If opponent hasn't pinged in 5s status is DISCONNECTED
+    local isOpponentDisconnected = 0
+    if (opponentLastActive > 0) and (nowMs - opponentLastActive > 5000) then
+      isOpponentDisconnected = 1
+    end
+    
+    return state .. ':' .. isOpponentDisconnected
   `
 };
 
