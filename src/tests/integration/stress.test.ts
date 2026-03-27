@@ -2,10 +2,10 @@ import { testApiHandler } from "next-test-api-route-handler";
 import { vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import * as syncRoute from "@/app/api/race/sync/route";
-import * as rehydrateRoute from "@/app/api/race/[roomId]/route";
-import * as createRoute from "@/app/api/race/create/route";
-import * as joinRoute from "@/app/api/race/join/route";
+import * as syncRoute from "@/app/api/race/(shared)/sync/route";
+import * as rehydrateRoute from "@/app/api/race/(shared)/[roomId]/route";
+import * as createRoute from "@/app/api/race/(multiplayer)/create/route";
+import * as joinRoute from "@/app/api/race/(multiplayer)/join/route";
 import { RaceData } from "@/lib/multiplayer/types";
 import { auth } from "@/lib/auth";
 
