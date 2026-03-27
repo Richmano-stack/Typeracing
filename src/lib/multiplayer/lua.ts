@@ -188,6 +188,86 @@ export const LUA_SCRIPTS = {
     end
     
     return state .. ':' .. isOpponentDisconnected
+  `,
+
+  // THE BRAIN: The high-frequency heart of the race.
+  // KEYS[1] = roomKey
+  // ARGS[1] = userId, ARGS[2] = progress, ARGS[3] = wpm
+  SYNC_PULSE: `
+    local key = KEYS[1]
+    local userId = ARGV[1]
+    local progress = tonumber(ARGV[2])
+    local wpm = tonumber(ARGV[3])
+    
+    -- Authoritative Server Time
+    local time = redis.call('TIME')
+    local nowMs = (tonumber(time[1]) * 1000) + math.floor(tonumber(time[2]) / 1000)
+    
+    local data = redis.call('HMGET', key, 'state', 'host_id', 'guest_id', 'target_start_ms', 'winner_id', 'prompt_text')
+    local state = data[1]
+    local hostId = data[2]
+    local guestId = data[3]
+    local targetStartMs = tonumber(data[4] or '0')
+    local winnerId = data[5]
+    local promptText = data[6] or ''
+
+    if not state then return 'ERROR_NOT_FOUND' end
+
+    -- 1. Identity Check
+    local role = nil
+    local opponentRole = nil
+    if userId == hostId then 
+      role = 'host'
+      opponentRole = 'guest'
+    elseif userId == guestId then 
+      role = 'guest'
+      opponentRole = 'host'
+    end
+    if not role then return 'ERROR_UNAUTHORIZED' end
+
+    -- 2. State Gatekeeper (The Lazy Start)
+    if state == 'COUNTDOWN' then
+      if nowMs >= targetStartMs then
+        redis.call('HSET', key, 'state', 'IN_PROGRESS')
+        state = 'IN_PROGRESS'
+      else
+        -- Reject jump-start
+        if progress > 0 then return 'ERROR_WAITING' end
+      end
+    end
+
+    -- 3. Post-Finish Lock
+    if state == 'FINISHED' then
+      return 'FINISHED:' .. (winnerId or '')
+    end
+
+    -- 4. Anti-Cheat (The Teleport Check)
+    -- If they have > 10% progress but race just started (< 500ms), or WPM > 350
+    if state == 'IN_PROGRESS' then
+      local elapsed = nowMs - targetStartMs
+      if (progress > 10 and elapsed < 500) or (wpm > 350) then
+        return 'ERROR_CHEATING'
+      end
+    end
+
+    -- 5. Progress Write
+    redis.call('HSET', key, role .. '_progress', tostring(progress), role .. '_wpm', tostring(wpm), role .. '_last_active', tostring(nowMs))
+
+    -- 6. Finish Line Logic
+    if state == 'IN_PROGRESS' and progress >= 100 then
+      local field = role .. '_finished_ms'
+      redis.call('HSET', key, field, tostring(nowMs))
+      
+      if not winnerId or winnerId == '' then
+        redis.call('HSET', key, 'winner_id', userId, 'state', 'FINISHED')
+        winnerId = userId
+        state = 'FINISHED'
+      end
+    end
+
+    -- 7. Return Pulse Data
+    local opponentData = redis.call('HMGET', key, opponentRole .. '_progress', opponentRole .. '_wpm')
+    return state .. ':' .. (winnerId or '') .. ':' .. (opponentData[1] or '0') .. ':' .. (opponentData[2] or '0') .. ':' .. tostring(targetStartMs)
   `
 };
 

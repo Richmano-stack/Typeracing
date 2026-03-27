@@ -160,3 +160,44 @@ export async function heartbeat(roomId: string, userId: string): Promise<{
     isOpponentDisconnected: isDisc === '1'
   };
 }
+
+/**
+ * The Authoritative Sync Pulse ("The Brain").
+ * Atomic state management, anti-cheat, and progress tracking.
+ */
+export async function syncPulse(
+  roomId: string, 
+  userId: string, 
+  progress: number, 
+  wpm: number
+): Promise<{
+  status: 'OK' | 'ERROR_NOT_FOUND' | 'ERROR_UNAUTHORIZED' | 'ERROR_WAITING' | 'ERROR_CHEATING',
+  state?: string,
+  winnerId?: string,
+  opponentProgress?: number,
+  opponentWpm?: number,
+  targetStartMs?: number
+}> {
+  const roomKey = `race:${roomId}`;
+  
+  const result = await redis.eval(
+    LUA_SCRIPTS.SYNC_PULSE,
+    [roomKey],
+    [userId, progress.toString(), wpm.toString()]
+  ) as string;
+
+  if (result.startsWith('ERROR_')) {
+    return { status: result as any };
+  }
+
+  const [state, winnerId, oppProg, oppWpm, targetStart] = result.split(':');
+  
+  return {
+    status: 'OK',
+    state,
+    winnerId: winnerId === '' ? undefined : winnerId,
+    opponentProgress: parseInt(oppProg || '0', 10),
+    opponentWpm: parseInt(oppWpm || '0', 10),
+    targetStartMs: parseInt(targetStart || '0', 10)
+  };
+}
