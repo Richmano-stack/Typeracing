@@ -48,6 +48,7 @@ export async function initialize(params: InitializeParams): Promise<RaceData> {
     guest_wpm: "0",
     host_last_active: nowMs.toString(),
     guest_last_active: "0",
+    created_at_ms: nowMs.toString(),
     host_finished_ms: "0",
     guest_finished_ms: "0",
     winner_id: "",
@@ -128,4 +129,34 @@ export async function startMultiplayer(roomId: string, userId: string): Promise<
   }
 
   return { status: result as any, serverNowMs };
+}
+
+/**
+ * Updates the requester's last_active timestamp and returns the room's current state.
+ * Also flags if the opponent appears to have disconnected.
+ */
+export async function heartbeat(roomId: string, userId: string): Promise<{
+  status: 'OK' | 'ERROR_NOT_FOUND' | 'ERROR_UNAUTHORIZED',
+  state?: string,
+  isOpponentDisconnected?: boolean
+}> {
+  const roomKey = `race:${roomId}`;
+  const nowMs = await getServerTimeMs();
+
+  const result = await redis.eval(
+    LUA_SCRIPTS.LOBBY_HEARTBEAT,
+    [roomKey],
+    [userId, nowMs.toString()]
+  ) as string;
+
+  if (result === 'ERROR_NOT_FOUND' || result === 'ERROR_UNAUTHORIZED') {
+    return { status: result as any };
+  }
+
+  const [state, isDisc] = result.split(':');
+  return {
+    status: 'OK',
+    state,
+    isOpponentDisconnected: isDisc === '1'
+  };
 }

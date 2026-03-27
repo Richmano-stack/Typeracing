@@ -22,15 +22,34 @@ export async function GET(
       return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
     }
 
-    // 1. Session Identification
-    // "Who is asking?" - though we return the same room data for anyone, 
-    // better-auth integration is requested for potential isHost/isGuest flagging.
+    // 1. Session & Identity Identification
     const session = await auth.api.getSession({
       headers: req.headers,
     });
+    const { searchParams } = new URL(req.url);
+    const guestId = searchParams.get("guestId");
+    const requesterId = session?.user?.id || guestId;
 
-    // 2. Redis Retrieval
-    const roomData = await RedisRoomService.getRoom(roomId);
+    // 2. Heartbeat or Passive Retrieval
+    let roomData: Awaited<ReturnType<typeof RedisRoomService.getRoom>>;
+    let isOpponentDisconnected = false;
+
+    if (requesterId) {
+      // Active Heartbeat
+      const heartbeatRes = await RedisRoomService.heartbeat(roomId, requesterId);
+      if (heartbeatRes.status === 'OK') {
+        roomData = await RedisRoomService.getRoom(roomId);
+        isOpponentDisconnected = heartbeatRes.isOpponentDisconnected || false;
+      } else if (heartbeatRes.status === 'ERROR_NOT_FOUND') {
+        return NextResponse.json({ error: "Room not found" }, { status: 404 });
+      } else {
+        // Observer/Unauthorized fallthrough
+        roomData = await RedisRoomService.getRoom(roomId);
+      }
+    } else {
+      // Passive Observer
+      roomData = await RedisRoomService.getRoom(roomId);
+    }
 
     // 3. Existence Validation
     if (!roomData) {
@@ -49,6 +68,7 @@ export async function GET(
       is_guest_ready: roomData.guest_ready,
       target_start_ms: roomData.target_start_ms,
       prompt_text: roomData.prompt_text,
+      is_opponent_disconnected: isOpponentDisconnected,
     };
 
     // 6. Response Dispatch

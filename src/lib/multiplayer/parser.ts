@@ -20,6 +20,7 @@ export function parseRaceData(raw: Record<string, string>): RaceData {
     host_finished_ms: parseInt(raw.host_finished_ms    || "0"),
     guest_finished_ms: parseInt(raw.guest_finished_ms   || "0"),
     ready_deadline_ms: parseInt(raw.ready_deadline_ms   || "0"),
+    created_at_ms: parseInt(raw.created_at_ms           || "0"),
     winner_id: raw.winner_id || null,
   };
 }

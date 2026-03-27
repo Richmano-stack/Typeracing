@@ -18,6 +18,7 @@ export interface RaceData {
   host_finished_ms: number;
   guest_finished_ms: number;
   ready_deadline_ms: number;
+  created_at_ms: number;
   winner_id: string | null;
   persisted_to_db: boolean;
 }
