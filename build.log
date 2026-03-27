@@ -1,6 +1,0 @@
-
-> typeracing@0.1.0 build C:\Users\rnasy\Desktop\Typeracing
-> prisma generate && next build
-
-Failed to load config file "C:\Users\rnasy\Desktop\Typeracing" as a TypeScript/JavaScript module. Error: PrismaConfigEnvError: Cannot resolve environment variable: DIRECT_URL.
- ELIFECYCLE  Command failed with exit code 1.
