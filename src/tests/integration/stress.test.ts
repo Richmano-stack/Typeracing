@@ -2,10 +2,11 @@ import { testApiHandler } from "next-test-api-route-handler";
 import { vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import * as syncRoute from "@/app/api/race/(shared)/sync/route";
+import * as syncRoute from "@/app/api/race/(multiplayer)/sync/route";
 import * as rehydrateRoute from "@/app/api/race/(shared)/[roomId]/route";
 import * as createRoute from "@/app/api/race/(multiplayer)/create/route";
 import * as joinRoute from "@/app/api/race/(multiplayer)/join/route";
+import * as saveRoute from "@/app/api/race/(multiplayer)/save/route";
 import { RaceData } from "@/lib/multiplayer/types";
 import { auth } from "@/lib/auth";
 
@@ -97,6 +98,7 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
             ready_deadline_ms: 0,
             host_finished_ms: 0,
             guest_finished_ms: 0,
+            created_at_ms: Date.now(),
             winner_id: "",
             persisted_to_db: false
         };
@@ -249,7 +251,7 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
                             method: "POST",
                             body: JSON.stringify({
                                 roomId: TEST_ROOM_ID,
-                                userId: r.userId,
+                                guestId: r.userId, // fallback for identity
                                 progress: r.progress,
                                 wpm: r.wpm
                             })
@@ -264,6 +266,22 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
             });
 
             await Promise.all(reqs.map(r => runSync(r)));
+            
+            // 2. TRIGGER PERSISTENCE (EXPLICIT STEP)
+            // Call twice to test atomicity/lock
+            await testApiHandler({
+                appHandler: saveRoute,
+                url: "/api/race/multiplayer/save",
+                async test({ fetch }) {
+                    const res1 = await fetch({ method: "POST", body: JSON.stringify({ roomId: TEST_ROOM_ID, guestId: USER_A_ID }) });
+                    expect(res1.status).toBe(200);
+
+                    // Second call should also be 200 but ALREADY_SAVED
+                    const res2 = await fetch({ method: "POST", body: JSON.stringify({ roomId: TEST_ROOM_ID, guestId: USER_B_ID }) });
+                    expect(res2.status).toBe(200);
+                    expect((await res2.json()).status).toBe("ALREADY_SAVED");
+                }
+            });
 
             // Assertion Buffering: wait 50ms for Redis to settle
             await new Promise(resolve => setTimeout(resolve, 50));
@@ -348,7 +366,7 @@ describe("Multiplayer Duel Engine - Stress & Authority Tests", () => {
                         method: "POST",
                         body: JSON.stringify({
                             roomId: TEST_ROOM_ID,
-                            userId: USER_A_ID,
+                            guestId: USER_A_ID, // Use guestId field
                             progress: 50,
                             wpm: 60
                         })
