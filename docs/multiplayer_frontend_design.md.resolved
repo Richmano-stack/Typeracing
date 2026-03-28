@@ -1,0 +1,238 @@
+# Multiplayer Frontend System Design
+
+## Current State (What Already Exists)
+
+| Layer | Asset | Status |
+|-------|-------|--------|
+| **Page** | [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx) | ✅ Exists — has Lobby overlay, Countdown overlay, Game Board, Results Modal |
+| **Page** | [SoloRacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/(main)/(race)/solo-race/page.tsx) | ✅ Exists — fully wired for solo play |
+| **Component** | [TypeInput](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/game/TypeInput.tsx) | ✅ Shared — reads `useRaceStore`, disabled outside `IN_PROGRESS` |
+| **Component** | [GhostCar](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/game/GhostCar.tsx) | ✅ Shared — smooth interpolation with predictive drift & stalemate detection |
+| **Component** | [PlayerCar](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/game/PlayerCar.tsx) | ✅ Shared — local player progress visualization |
+| **Component** | [ResultsModal](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx) | ⚠️ Solo-focused — uses [FinishResponse](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts#10-17) type, no winner/loser concept |
+| **Hook** | [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts) | ⚠️ Partial — polls `/api/race/sync` every 500ms, but doesn't handle Ready/Start/Save |
+| **Hook** | [useSoloRace](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useSoloRace.ts) | ✅ Solo only — typing logic |
+| **Store** | [useRaceStore](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts) | ✅ Shared — has the right [GameState](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#3-4) type and opponent fields |
+| **Service** | [raceApi](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts) | ⚠️ Solo only — [initiate](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts#19-34), [start](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts#35-51), [finish](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts#52-68). No multiplayer methods |
+
+---
+
+## Critical Design Constraints (Architect Refinements)
+
+> [!CAUTION]
+> These three rules prevent the most dangerous bugs in multiplayer frontends.
+
+### 1. The Hook Handover (Single Source of Truth)
+Only **one** polling loop may write to `useRaceStore` at any given time. The [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) must act as a switch:
+```typescript
+// RacePage.tsx — Only one heartbeat lives at a time.
+const isLobbyPhase = gameState === 'WAITING_FOR_GUEST' || gameState === 'LOBBY_FULL' || gameState === 'READY_CHECK';
+
+// useLobbyPolling runs during lobby, useRaceSync runs during race
+// useLobbyPolling MUST clearInterval the exact ms state becomes COUNTDOWN
+```
+Without this, two intervals will fight over the Zustand store and cause UI flicker.
+
+### 2. Persistence Idempotency (No Double-Saves)
+Both players' frontends will call `saveResults()` when they see `FINISHED`. The backend's `PERSIST_LOCK` Lua script handles this, but the frontend **must** treat `ALREADY_SAVED` as a success:
+```typescript
+// In the save trigger logic:
+if (result.status === 'SAVED' || result.status === 'ALREADY_SAVED') {
+  store.persistenceStatus = 'SAVED'; // Both are success states
+}
+```
+The "Loser" should never see a "Failed to Save" error.
+
+### 3. Clock Offset in Lobby Hook
+The countdown overlay depends on `target_start_ms` (server time). The **lobby hook** must calculate the clock offset *before* the race starts:
+```typescript
+// useLobbyPolling must do this on every poll response:
+const clockOffsetMs = serverNowMs - Date.now();
+store.setGameState({ clockOffsetMs });
+```
+Without this, the `CountdownOverlay` will be jittery or show wrong numbers.
+
+---
+
+## What Needs To Be Built
+
+### Pages (2 Total)
+
+You already have the core **RacePage**. You need **one new page**.
+
+#### 1. [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) — `/race/[roomId]` (EXISTS, NEEDS WIRING)
+**What it does:** The multiplayer game board. Handles the full lifecycle from LOBBY → COUNTDOWN → IN_PROGRESS → FINISHED.
+
+**What's missing on this page:**
+- **Ready-Up UI**: A "Ready" button that appears when `state === 'LOBBY_FULL'`, calls `POST /api/race/ready`
+- **Start Trigger**: Auto-triggered when both players ready up (the `READY_CHECK` response triggers `POST /api/race/multiplayer-start`)
+- **Persistence Trigger**: When `state` transitions to `FINISHED`, automatically calls `POST /api/race/multiplayer/save`
+- **Winner/Loser Display**: The [ResultsModal](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx#16-144) needs to show "You Won!" vs "You Lost!" based on `winnerId`
+
+#### 2. `MultiplayerLobbyPage` — `/lobby` (NEW PAGE)
+**What it does:** The entry point for multiplayer. Where users create or join rooms.
+
+**Features:**
+- **"Create Room" button**: Calls `POST /api/race/create`, gets back a `roomId`, then redirects to `/race/[roomId]`
+- **"Join via Link" flow**: This already works — users navigate directly to `/race/[roomId]`, which triggers `PATCH /api/race/join` automatically
+- **Active Room Display** (optional v2): Show rooms the user is currently in (via a heartbeat check)
+
+> [!NOTE]
+> The solo race page at `/(main)/(race)/solo-race` is completely separate and doesn't need changes.
+
+---
+
+### Services (1 New File)
+
+#### [NEW] `multiplayerApi.ts` — `src/services/multiplayerApi.ts`
+**Why:** Centralizes all multiplayer API calls in one place, mirroring the existing [raceApi.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts) pattern for solo.
+
+**Methods needed:**
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `createRoom()` | `POST /api/race/create` | Creates a new room, returns `roomId` + `hostId` |
+| `joinRoom(roomId)` | `POST /api/race/join` | Joins an existing room as guest |
+| `readyUp(roomId, userId)` | `POST /api/race/ready` | Marks a player as ready |
+| `startRace(roomId, userId)` | `POST /api/race/multiplayer-start` | Initiates the countdown (either player can trigger once both are ready) |
+| `saveResults(roomId, guestId?)` | `POST /api/race/multiplayer/save` | Persists race results to Postgres |
+| [getRoom(roomId)](file:///c:/Users/rnasy/Desktop/Typeracing/src/lib/multiplayer/redis-room-service.ts#65-80) | `GET /api/race/[roomId]` | Fetches room state for rehydration |
+
+---
+
+### Hooks (2 Modifications)
+
+#### [MODIFY] [useRaceSync.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts)
+**Current behavior:** Polls `/api/race/sync` every 500ms and writes to Zustand.
+
+**What to add:**
+1. **Stop polling when `FINISHED`** — Currently it keeps polling after the race ends
+2. **Trigger save on finish** — When `state` transitions to `FINISHED`, call `multiplayerApi.saveResults()` once. Treat both `SAVED` and `ALREADY_SAVED` as success states
+3. **Guard against activation during lobby** — This hook must be disabled during `WAITING_FOR_GUEST`, `LOBBY_FULL`, `READY_CHECK` (the Hook Handover rule)
+
+#### [NEW] `useLobbyPolling.ts` — `src/hooks/useLobbyPolling.ts`
+**Why:** The Lobby phase (WAITING_FOR_GUEST → LOBBY_FULL → READY_CHECK) needs its own polling loop, separate from the high-frequency race sync.
+
+**Behavior:**
+- Polls `GET /api/race/[roomId]` every 2-3 seconds (much slower than sync)
+- Updates the store with the room state so the Lobby UI is reactive
+- **Calculates clock offset** on every response: `clockOffsetMs = serverNowMs - Date.now()`
+- **Hard stop** once `state === 'COUNTDOWN'` — must `clearInterval` immediately so [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts#23-103) becomes the sole writer
+- Detects opponent disconnection via [heartbeat](file:///c:/Users/rnasy/Desktop/Typeracing/src/lib/multiplayer/redis-room-service.ts#134-163) data
+
+---
+
+### Store Modifications (1 Modification)
+
+#### [MODIFY] [useRaceStore.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts)
+**Current fields that already work:** `state`, `opponentProgress`, `opponentWpm`, `winnerId`, `isReady`, `localFinished`, `clockOffsetMs`, `targetStartMs`
+
+**What to add:**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `role` | `'host' \| 'guest' \| null` | Identifies this client's role for UI labeling and debug |
+| `hostReady` | `boolean` | Display host ready status in lobby |
+| `guestReady` | `boolean` | Display guest ready status in lobby |
+| `opponentName` | `string \| null` | Display in [GhostCar](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/game/GhostCar.tsx#8-11) name tag |
+| `persistenceStatus` | `'IDLE' \| 'SAVING' \| 'SAVED' \| 'ALREADY_SAVED' \| 'ERROR'` | Tracks save state for [ResultsModal](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx#16-144) |
+
+---
+
+### Components (Modifications + 1 New)
+
+#### [MODIFY] [ResultsModal.tsx](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx)
+**What to add:**
+- **Winner/Loser banner**: Use `winnerId` vs `userId` to show "VICTORY" or "DEFEAT"
+- **Opponent stats**: Show opponent's WPM alongside yours for comparison
+- **Rematch button** (optional v2): Placeholder for future rematch flow
+- **Persistence feedback**: Show "Saving..." → "Saved!" using `persistenceStatus` from store
+
+#### [NEW] `ReadyUpOverlay.tsx` — `src/components/game/ReadyUpOverlay.tsx`
+**What it does:** Replaces the current static "Awaiting Opponent" overlay when both players are in the room.
+
+**UI States:**
+
+```
+WAITING_FOR_GUEST  →  "Share the link. Awaiting opponent..."  (existing overlay, keep as-is)
+LOBBY_FULL         →  [Ready Up] button for each player, shows ready status badges
+READY_CHECK        →  "Both players ready! Starting..." (auto-triggers countdown via API)
+```
+
+---
+
+## Data Flow Summary
+
+```mermaid
+sequenceDiagram
+    participant User as Browser (RacePage)
+    participant Store as useRaceStore
+    participant LobbyPoll as useLobbyPolling
+    participant SyncPoll as useRaceSync
+    participant API as Backend API
+    participant Redis as Redis
+
+    Note over User: User lands on /race/[roomId]
+
+    User->>API: GET /api/race/[roomId] (rehydrate)
+    API-->>User: roomData (state, prompt, players)
+    User->>Store: setGameState(WAITING_FOR_GUEST)
+
+    LobbyPoll->>API: GET /api/race/[roomId] (every 2s)
+    API-->>LobbyPoll: state: LOBBY_FULL
+    LobbyPoll->>Store: setGameState(LOBBY_FULL)
+
+    User->>API: POST /api/race/ready (Ready button click)
+    API-->>User: room state with ready flags
+
+    Note over User: Both ready → READY_CHECK
+
+    User->>API: POST /api/race/multiplayer-start
+    API-->>User: targetStartMs, serverNowMs
+    User->>Store: setGameState(COUNTDOWN, targetStartMs)
+
+    Note over LobbyPoll: Stops polling (race starting)
+
+    Note over SyncPoll: Starts polling at 500ms
+
+    SyncPoll->>API: POST /api/race/sync (progress, wpm)
+    API-->>SyncPoll: opponentProgress, state, winnerId
+
+    Note over SyncPoll: state === FINISHED
+
+    SyncPoll->>Store: setGameState(FINISHED, winnerId)
+    User->>API: POST /api/race/multiplayer/save
+    API-->>User: SAVED / ALREADY_SAVED
+    User->>Store: persistenceStatus = SAVED
+```
+
+---
+
+## File Map (What Goes Where)
+
+```
+src/
+├── app/
+│   ├── lobby/
+│   │   └── page.tsx                    ← [NEW] Lobby entry page
+│   └── race/
+│       └── [roomId]/
+│           └── page.tsx                ← [MODIFY] Wire ready/start/save
+├── components/
+│   ├── game/
+│   │   ├── TypeInput.tsx               ← No changes needed
+│   │   ├── GhostCar.tsx                ← No changes needed
+│   │   ├── PlayerCar.tsx               ← No changes needed
+│   │   └── ReadyUpOverlay.tsx          ← [NEW] Ready-up UI
+│   └── ResultsModal.tsx                ← [MODIFY] Winner/Loser + persistence feedback
+├── hooks/
+│   ├── useRaceSync.ts                  ← [MODIFY] Stop on finish, trigger save
+│   └── useLobbyPolling.ts             ← [NEW] Lobby-phase polling
+├── services/
+│   ├── raceApi.ts                      ← No changes needed (solo)
+│   └── multiplayerApi.ts              ← [NEW] All multiplayer API calls
+└── store/
+    └── useRaceStore.ts                 ← [MODIFY] Add role, ready flags, persistence status
+```
+
+**Summary:** 1 new page, 1 new service, 1 new hook, 1 new component, and 4 modifications to existing files.

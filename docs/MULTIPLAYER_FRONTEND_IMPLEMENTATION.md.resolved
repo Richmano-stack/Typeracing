@@ -1,0 +1,542 @@
+# MULTIPLAYER FRONTEND IMPLEMENTATION
+
+## Architecture Overview
+
+```mermaid
+graph LR
+    subgraph "Phase 1: Data Layer"
+        Store["useRaceStore"] --> Service["multiplayerApi"]
+    end
+    subgraph "Phase 2: Observer"
+        LobbyHook["useLobbyPolling"] --> Store
+    end
+    subgraph "Phase 3: Reactive UI"
+        ReadyOverlay["ReadyUpOverlay"] --> Service
+        ReadyOverlay --> Store
+    end
+    subgraph "Phase 4: Engine"
+        SyncHook["useRaceSync"] --> Store
+    end
+    subgraph "Phase 5: After-Action"
+        Results["ResultsModal"] --> Store
+    end
+
+    LobbyHook -.->|"COUNTDOWN: Kill"| SyncHook
+    SyncHook -.->|"FINISHED: Trigger"| Results
+```
+
+> [!IMPORTANT]
+> **The Golden Rule:** Only one polling hook may own the Zustand store at any time. The [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) acts as the switch.
+
+---
+
+## Phase 1: Persistence & Data Layer
+
+> The foundation. Nothing can render, poll, or persist without the data contracts being defined first.
+
+### Step 1.1 — Expand [useRaceStore.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts)
+
+**Rationale:** Every UI component and hook reads from this single Zustand store. Adding the new fields first means every downstream consumer can be built against a stable contract, even before the hooks that populate them exist.
+
+#### Input/Output Contract
+
+```typescript
+// New fields to add to RaceState
+interface RaceStateAdditions {
+  role: 'host' | 'guest' | null;       // Set on room rehydration
+  hostReady: boolean;                   // From lobby poll
+  guestReady: boolean;                  // From lobby poll
+  opponentName: string | null;          // From room data
+  persistenceStatus: PersistenceStatus; // Set by save trigger
+}
+
+type PersistenceStatus = 'IDLE' | 'SAVING' | 'SAVED' | 'ALREADY_SAVED' | 'ERROR';
+```
+
+#### Internal State Logic
+
+| Action | Trigger | Effect |
+|--------|---------|--------|
+| [setGameState(partial)](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#56-57) | Any hook response | Merges partial state into store |
+| [updateLocalProgress(p, wpm)](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#58-67) | `TypeInput.onInput` | Sets `localProgress`, `localWpm`, flips `localFinished` at 100 |
+| [resetStore()](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#68-69) | Page unmount | Resets all fields to `initialState` including new additions |
+
+#### Changes Required
+
+Add these to `initialState`:
+```typescript
+role: null,
+hostReady: false,
+guestReady: false,
+opponentName: null,
+persistenceStatus: 'IDLE',
+```
+
+Add [GameState](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#3-4) enum value: `'WAITING_FOR_GUEST' | 'LOBBY_FULL' | 'READY_CHECK'` alongside existing states.
+
+---
+
+### Step 1.2 — Create `multiplayerApi.ts`
+
+**Rationale:** Separating API calls from hooks follows the same pattern as [raceApi.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/services/raceApi.ts) (solo). Hooks orchestrate *when* to call; the service handles *how*. This makes unit testing hooks trivial — you mock `multiplayerApi` instead of [fetch](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#51-72).
+
+#### Method Contracts
+
+```typescript
+// src/services/multiplayerApi.ts
+
+export interface CreateRoomResponse {
+  roomId: string;
+  hostId: string;
+  room: RaceData;           // Full Redis-parsed room state
+}
+
+export interface JoinRoomResponse {
+  roomId: string;
+  guestId: string;
+  room: RaceData;
+}
+
+export interface ReadyUpResponse {
+  roomId: string;
+  room: RaceData;           // Contains updated host_ready / guest_ready
+}
+
+export interface StartRaceResponse {
+  roomId: string;
+  targetStartMs: number;
+  serverNowMs: number;
+  status: 'STARTING' | 'ALREADY_STARTING';
+}
+
+export interface LobbyHeartbeatResponse {
+  roomId: string;
+  serverNowMs: number;      // ← Critical for clock offset
+  room: {
+    host_id: string;
+    guest_id: string | null;
+    status: string;
+    is_guest_ready: boolean;
+    target_start_ms: number;
+    prompt_text: string;
+    is_opponent_disconnected: boolean;
+  };
+}
+
+export interface SaveResultsResponse {
+  status: 'SAVED' | 'ALREADY_SAVED';
+}
+```
+
+**Error Contract:** Every method throws a typed error with `status` code:
+```typescript
+export class MultiplayerApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+```
+
+---
+
+### Phase 1 Definition of Done
+
+- [ ] [useRaceStore.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts) compiles with new fields, [resetStore()](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#68-69) clears them
+- [ ] `multiplayerApi.ts` exports all 6 methods with correct type signatures
+- [ ] [GameState](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#3-4) type includes `WAITING_FOR_GUEST`, `LOBBY_FULL`, `READY_CHECK`
+- [ ] **Verification:** `pnpm build` passes (type-check only, no runtime validation yet)
+
+---
+
+## Phase 2: The "Observer" Layer
+
+> This layer is the "eyes" of the frontend during the lobby phase. It watches Redis via the heartbeat endpoint and synchronizes the client's clock before the race begins.
+
+### Step 2.1 — Create `useLobbyPolling.ts`
+
+**Rationale:** The lobby phase (WAITING → LOBBY_FULL → READY_CHECK → COUNTDOWN) is low-frequency (2-3s polls) and reads *different data* than the high-frequency race sync. Separating them:
+1. Prevents the race sync Lua script from being hit while in WAITING state (wasted Redis ops)
+2. Allows the lobby to calculate `clockOffsetMs` early, so the countdown is accurate from frame 1
+3. Enforces the "Single Source of Truth" constraint — only one writer at a time
+
+#### Input/Output Contract
+
+```typescript
+// Input Props
+interface LobbyPollingParams {
+  roomId: string | null;
+  userId: string | null;
+  enabled: boolean;           // The "switch" — false when race phase starts
+}
+
+// Output (returned to RacePage)
+interface LobbyPollingResult {
+  isPolling: boolean;
+  error: Error | null;
+}
+```
+
+#### Internal State Logic
+
+```typescript
+// useEffect dependencies: [roomId, userId, enabled]
+// Polling Interval: 2500ms
+
+useEffect(() => {
+  if (!enabled || !roomId) return;
+  
+  const intervalId = setInterval(async () => {
+    const data = await multiplayerApi.lobbyHeartbeat(roomId, userId);
+    
+    // 1. Clock Offset (CRITICAL — must happen BEFORE countdown)
+    const clockOffsetMs = data.serverNowMs - Date.now();
+    
+    // 2. Write to store (this is the ONLY writer during lobby)
+    setGameState({
+      state: data.room.status as GameState,
+      hostReady: /* derive from room data */,
+      guestReady: data.room.is_guest_ready,
+      targetStartMs: data.room.target_start_ms || null,
+      clockOffsetMs,
+    });
+  }, 2500);
+
+  // CLEANUP: Hard kill on unmount or when `enabled` flips to false
+  return () => clearInterval(intervalId);
+}, [roomId, userId, enabled]);
+```
+
+> [!CAUTION]
+> **The Clock Offset calculation MUST happen in the lobby hook, not in [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts#23-103).** The countdown UI reads `targetStartMs` adjusted by `clockOffsetMs`. If the offset isn't calculated until the first sync pulse (500ms into the countdown), the user will see a jarring jump in the countdown timer.
+
+#### Cleanup Contract
+
+| Trigger | Action |
+|---------|--------|
+| `enabled` becomes `false` | `clearInterval` immediately |
+| Component unmount | `clearInterval` via useEffect return |
+| `state === 'COUNTDOWN'` detected in poll response | Parent sets `enabled = false` (the Hook Handover) |
+
+---
+
+### Step 2.2 — Wire the Hook Handover in [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224)
+
+**Rationale:** The [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) is the "Scheduler" — it decides which hook is active based on the current [GameState](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts#3-4). This is where the "Single Source of Truth" constraint is enforced.
+
+```typescript
+// RacePage.tsx — The Switch
+const gameState = useRaceStore((s) => s.state);
+
+const isLobbyPhase = 
+  gameState === 'WAITING_FOR_GUEST' || 
+  gameState === 'LOBBY_FULL' || 
+  gameState === 'READY_CHECK';
+
+// Phase 2 hook: active during lobby only
+useLobbyPolling({
+  roomId,
+  userId,
+  enabled: isLobbyPhase,
+});
+
+// Phase 4 hook: active during race only
+useRaceSync({
+  roomId,
+  userId,
+  currentProgress: localProgress,
+  currentWpm: localWpm,
+  enabled: !isLobbyPhase && gameState !== 'FINISHED',
+});
+```
+
+---
+
+### Phase 2 Definition of Done
+
+- [ ] `useLobbyPolling` polls `GET /api/race/lobby/[id]` every 2.5s when `enabled = true`
+- [ ] `clockOffsetMs` is written to the store on every poll response
+- [ ] Polling stops immediately when `enabled` flips to `false`
+- [ ] No two intervals are ever active simultaneously
+- [ ] **Verification:** Open two browser tabs to the same room URL. Tab 1 (Host) creates, Tab 2 (Guest) navigates to the link. Observe in DevTools Network tab:
+  - Lobby heartbeat requests fire at ~2.5s intervals
+  - Once state becomes `COUNTDOWN`, lobby requests stop and sync requests begin at 500ms
+
+---
+
+## Phase 3: The "Reactive" UI
+
+> This layer translates store state into interactive UI elements. It handles the Ready/Start handshake that bridges the lobby and the race.
+
+### Step 3.1 — Create `ReadyUpOverlay.tsx`
+
+**Rationale:** The current [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) has a static "Awaiting Opponent" overlay. The ready-up flow requires three distinct visual states within the lobby phase, each with different interactive elements.
+
+#### Input/Output Contract
+
+```typescript
+interface ReadyUpOverlayProps {
+  roomId: string;
+  userId: string | null;
+  onStartTriggered: () => void;   // Callback when countdown begins
+}
+```
+
+#### Internal State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING_FOR_GUEST
+    WAITING_FOR_GUEST --> LOBBY_FULL: Guest joins (via lobby poll)
+    LOBBY_FULL --> READY_CHECK: Both players ready (via ready API)
+    READY_CHECK --> COUNTDOWN: Start API called (auto-trigger)
+    COUNTDOWN --> [*]: Overlay dismissed
+```
+
+#### UI States
+
+| Store State | UI Rendered | Interactive Elements |
+|------------|-------------|---------------------|
+| `WAITING_FOR_GUEST` | Spinner + "Awaiting Opponent" | Copy Invite Link button |
+| `LOBBY_FULL` | Two player cards with ready badges | **"Ready Up"** button (calls `POST /api/race/ready`) |
+| `READY_CHECK` | "Both Ready! Launching..." | None (auto-triggers `POST /api/race/multiplayer-start`) |
+
+#### Key useEffect: Auto-Start Trigger
+
+```typescript
+// When both players are ready, auto-call the start endpoint
+useEffect(() => {
+  if (gameState !== 'READY_CHECK') return;
+
+  const triggerStart = async () => {
+    const result = await multiplayerApi.startRace(roomId, userId);
+    // Write countdown data to store
+    setGameState({
+      state: 'COUNTDOWN',
+      targetStartMs: result.targetStartMs,
+      clockOffsetMs: result.serverNowMs - Date.now(),
+    });
+    onStartTriggered();
+  };
+
+  triggerStart();
+}, [gameState]); // Only fires when state transitions TO READY_CHECK
+```
+
+> [!NOTE]
+> **Why either player can trigger start:** The `MULTIPLAYER_START` Lua script is idempotent. If both players' frontends call it simultaneously, the first gets `OK` and the second gets `ALREADY_STARTING` with the same `targetStartMs`. Both are success states.
+
+---
+
+### Step 3.2 — Wire Auto-Join Logic in [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224)
+
+**Rationale:** When a Guest navigates to `/race/[roomId]`, they need to automatically join the room. Currently [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224) only rehydrates — it doesn't call the join endpoint.
+
+```typescript
+// RacePage.tsx — On mount, determine role and auto-join if guest
+useEffect(() => {
+  const initRoom = async () => {
+    const roomData = await multiplayerApi.getRoom(roomId);
+    
+    if (roomData.room.host_id === userId) {
+      // I'm the host
+      setGameState({ role: 'host', state: roomData.room.state });
+    } else {
+      // I'm a guest — attempt to join
+      const joinResult = await multiplayerApi.joinRoom(roomId, userId);
+      setGameState({ role: 'guest', state: joinResult.room.state });
+    }
+  };
+  initRoom();
+}, [roomId]);
+```
+
+---
+
+### Phase 3 Definition of Done
+
+- [ ] `ReadyUpOverlay` renders three visual states matching the table above
+- [ ] Clicking "Ready Up" calls `POST /api/race/ready` and updates the store
+- [ ] When both players are ready, `POST /api/race/multiplayer-start` is auto-called
+- [ ] The `ALREADY_STARTING` response is handled gracefully (no error toast)
+- [ ] Guest auto-joins on page load; Host skips the join call
+- [ ] **Verification:** Two-tab test:
+  1. Tab 1: Create room → see "Awaiting Opponent" overlay
+  2. Tab 2: Navigate to room URL → auto-joins → both tabs see "LOBBY_FULL" overlay
+  3. Both tabs click "Ready Up" → overlay transitions to "Launching..."
+  4. Countdown begins on both tabs simultaneously (within 1s tolerance)
+
+---
+
+## Phase 4: The "Engine"
+
+> The high-frequency sync loop. This is **already mostly built** in [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts#23-103). The changes here are surgical: add an `enabled` guard, stop on finish, and let the Hook Handover control activation.
+
+### Step 4.1 — Modify [useRaceSync.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts)
+
+**Rationale:** The current hook polls regardless of game state. It needs to:
+1. Respect the Hook Handover (`enabled` prop)
+2. Stop polling once `FINISHED` to prevent wasted requests
+3. **Not** handle persistence (that's Phase 5's job)
+
+#### Updated Input Contract
+
+```typescript
+interface SyncParams {
+  roomId: string | null;
+  userId: string | null;
+  currentProgress: number;
+  currentWpm: number;
+  enabled: boolean;             // ← NEW: The Hook Handover switch
+}
+```
+
+#### Changes to `useQuery` Config
+
+```typescript
+useQuery({
+  // ...existing config...
+  enabled: !!roomId && !!userId && enabled,   // ← ADD enabled guard
+  refetchInterval: enabled ? 500 : false,     // ← STOP when disabled
+});
+```
+
+#### Changes to State Sync Effect
+
+```typescript
+useEffect(() => {
+  if (query.data) {
+    const data = query.data;
+    const clockOffsetMs = data.serverNowMs - Date.now();
+
+    setGameState({
+      state: data.state as GameState,
+      targetStartMs: data.targetStartMs,
+      opponentProgress: Number(data.opponentProgress) || 0,
+      opponentWpm: Number(data.opponentWpm) || 0,
+      winnerId: data.winnerId,
+      clockOffsetMs,
+    });
+  }
+}, [query.data, setGameState]);
+```
+
+No changes to this effect — it stays the same. The `enabled` flag in `useQuery` handles activation/deactivation.
+
+---
+
+### Phase 4 Definition of Done
+
+- [ ] [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts#23-103) accepts `enabled` prop and stops polling when `false`
+- [ ] Polling starts when `isLobbyPhase` flips to `false` (COUNTDOWN or IN_PROGRESS)
+- [ ] Polling stops when `gameState === 'FINISHED'`
+- [ ] Network tab shows: 0 sync requests during lobby, 500ms interval during race, 0 after finish
+- [ ] **Verification:** `pnpm build` passes. Two-tab test: observe the sync pulse frequency in Network tab during countdown → race → finish transitions
+
+---
+
+## Phase 5: The "After-Action"
+
+> Handles what happens once a winner is declared. Two responsibilities: persist to Postgres, and display the result.
+
+### Step 5.1 — Persistence Trigger (in [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224))
+
+**Rationale:** The save call lives in [RacePage](file:///c:/Users/rnasy/Desktop/Typeracing/src/app/race/%5BroomId%5D/page.tsx#23-224), not inside [useRaceSync](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts#23-103), because:
+1. It's a one-shot action (not a polling concern)
+2. It needs access to `persistenceStatus` state for the modal
+3. It must be idempotent — `useRef` prevents double-fires from React strict mode
+
+#### Implementation Logic
+
+```typescript
+// RacePage.tsx
+const hasSaved = useRef(false);
+
+useEffect(() => {
+  if (gameState !== 'FINISHED' || hasSaved.current) return;
+  hasSaved.current = true;
+  
+  const persist = async () => {
+    setGameState({ persistenceStatus: 'SAVING' });
+    try {
+      const result = await multiplayerApi.saveResults(roomId, userId);
+      // BOTH are success states (Persistence Idempotency rule)
+      setGameState({ 
+        persistenceStatus: result.status === 'SAVED' || result.status === 'ALREADY_SAVED' 
+          ? 'SAVED' 
+          : 'ERROR' 
+      });
+    } catch {
+      setGameState({ persistenceStatus: 'ERROR' });
+    }
+  };
+  
+  persist();
+}, [gameState]);
+```
+
+> [!IMPORTANT]
+> **Why `useRef` and not `useState`:** React 18 strict mode can double-fire effects. A ref survives re-renders without causing re-execution. This is the only correct pattern for fire-once side effects.
+
+---
+
+### Step 5.2 — Modify [ResultsModal.tsx](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx)
+
+**Rationale:** The existing modal is solo-focused. Multiplayer needs: winner/loser framing, opponent comparison, and persistence status feedback.
+
+#### Updated Props Contract
+
+```typescript
+interface ResultsModalProps {
+  isOpen: boolean;
+  isLoading: boolean;
+  results: FinishResponse | null;
+  onReset: () => void;
+  // New multiplayer props
+  isMultiplayer?: boolean;
+  isWinner?: boolean;               // winnerId === userId
+  opponentWpm?: number;
+  persistenceStatus?: PersistenceStatus;
+}
+```
+
+#### UI Additions
+
+| Condition | Rendered Element |
+|-----------|-----------------|
+| `isMultiplayer && isWinner` | "VICTORY" banner with green glow |
+| `isMultiplayer && !isWinner` | "DEFEAT" banner with red accent |
+| `persistenceStatus === 'SAVING'` | Spinner in place of "Stats Synchronized" badge |
+| `persistenceStatus === 'SAVED'` | "Stats Synchronized" badge (existing) |
+| `persistenceStatus === 'ERROR'` | "Save Failed — stats won't appear on profile" warning |
+| `opponentWpm` present | Side-by-side WPM comparison card |
+
+---
+
+### Phase 5 Definition of Done
+
+- [ ] `FINISHED` state triggers exactly one `POST /api/race/multiplayer/save` call
+- [ ] `ALREADY_SAVED` response shows "Saved" (not "Error") in the modal
+- [ ] [ResultsModal](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx#16-144) displays "VICTORY" or "DEFEAT" based on `winnerId`
+- [ ] Opponent WPM is displayed for comparison when available
+- [ ] The save spinner appears while `persistenceStatus === 'SAVING'`
+- [ ] **Verification:** Two-tab end-to-end test:
+  1. Complete a full race (Host types to 100%, then Guest)
+  2. Both tabs should show the [ResultsModal](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx#16-144)
+  3. Winner tab shows "VICTORY", Loser tab shows "DEFEAT"
+  4. Both tabs show "Stats Synchronized" (not "Error")
+  5. Check Postgres: `SELECT * FROM "RaceResult" ORDER BY "completedAt" DESC LIMIT 2;` — exactly 2 new rows
+
+---
+
+## Execution Order Summary
+
+| Order | Phase | Files Touched | Depends On |
+|-------|-------|---------------|------------|
+| 1 | Phase 1 | [useRaceStore.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/store/useRaceStore.ts), `multiplayerApi.ts` | Nothing (foundation) |
+| 2 | Phase 2 | `useLobbyPolling.ts`, `RacePage.tsx` | Phase 1 (store + API) |
+| 3 | Phase 3 | `ReadyUpOverlay.tsx`, `RacePage.tsx` | Phase 2 (lobby polling provides state) |
+| 4 | Phase 4 | [useRaceSync.ts](file:///c:/Users/rnasy/Desktop/Typeracing/src/hooks/useRaceSync.ts) | Phase 2 (Hook Handover switch) |
+| 5 | Phase 5 | `RacePage.tsx`, [ResultsModal.tsx](file:///c:/Users/rnasy/Desktop/Typeracing/src/components/ResultsModal.tsx) | Phase 4 (FINISHED state from sync) |
+
+> [!TIP]
+> **Parallelism opportunity:** Phase 3 (UI components) and Phase 4 (sync hook changes) can be done in parallel since they don't touch the same files. The critical path is: Phase 1 → Phase 2 → Phase 5.
