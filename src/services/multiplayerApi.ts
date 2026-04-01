@@ -31,6 +31,7 @@ export interface LobbyHeartbeatResponse {
     host_id: string;
     guest_id: string | null;
     status: string;
+    is_host_ready: boolean;
     is_guest_ready: boolean;
     target_start_ms: number;
     prompt_text: string;

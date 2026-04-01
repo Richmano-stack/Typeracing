@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from "@/lib/auth-client";
 import { useRaceSync } from '@/hooks/useRaceSync';
+import { useLobbyPolling } from '@/hooks/useLobbyPolling';
 import { useRaceStore } from '@/store/useRaceStore';
 import { TypeInput } from '@/components/game/TypeInput';
 import { GhostCar } from '@/components/game/GhostCar';
@@ -38,55 +39,70 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
         clockOffsetMs, 
         localProgress, 
         localWpm, 
-        resetStore 
+        resetStore,
+        setGameState,
     } = useRaceStore();
 
-    // Fetch Initial Room Meta
-    useEffect(() => {
-        if (!roomId) {
-            router.push('/lobby');
-            return;
-        }
+    // 1. Hook Handover (Single Source of Truth)
+    const isLobbyPhase = 
+      gameState === 'LOBBY' || 
+      gameState === 'WAITING_FOR_GUEST' || 
+      gameState === 'LOBBY_FULL' || 
+      gameState === 'READY_CHECK';
 
-        const fetchRoomData = async () => {
-             try {
-                const res = await fetch(`/api/race/${roomId}`);
-                if (!res.ok) {
-                   if (res.status === 404) {
-                       toast.error('Room Expired or Not Found');
-                       router.push('/lobby');
-                       return;
-                   }
-                   throw new Error('Failed to load room');
-                }
-                const data = await res.json();
-                setRoomData(data.room);
-             } catch (error) {
-                console.error(error);
-                toast.error('Connection error');
-                router.push('/lobby');
-             } finally {
-                setIsRoomLoading(false);
-             }
-        };
-
-        fetchRoomData();
-    }, [roomId, router]);
-
-    // Handle Clean Exit
-    useEffect(() => {
-        return () => {
-            resetStore();
-        };
-    }, [resetStore]);
-
-    // Core Sync Loop
-    useRaceSync({
-        roomId,
-        userId,
-        currentProgress: localProgress,
-        currentWpm: localWpm,
+    // Phase 2 hook: active during lobby only
+    const lobbyQuery = useLobbyPolling({
+      roomId,
+      userId,
+      enabled: isLobbyPhase,
     });
+
+    // Phase 4 hook: active during race only
+    useRaceSync({
+      roomId,
+      userId,
+      currentProgress: localProgress,
+      currentWpm: localWpm,
+      enabled: !isLobbyPhase && gameState !== 'FINISHED',
+    });
+
+    // Initial Rehydration (Only if not already set or lobby needs it)
+    useEffect(() => {
+        if (!roomId || !isLobbyPhase) return;
+        
+        const initRoom = async () => {
+            try {
+                const res = await fetch(`/api/race/${roomId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setRoomData(data.room);
+                    setGameState({ 
+                        state: data.room.state,
+                        targetStartMs: data.room.target_start_ms 
+                    });
+                }
+            } catch (error) {
+                console.error("Initial rehydration failed", error);
+            } finally {
+                setIsRoomLoading(false);
+            }
+        };
+
+        if (isRoomLoading) {
+            initRoom();
+        }
+    }, [roomId, isLobbyPhase, isRoomLoading, setGameState]);
+
+    // Keep local roomData in sync for prompt_text
+    useEffect(() => {
+        if (lobbyQuery.data?.room.prompt_text) {
+            setRoomData((prev) => ({
+                ...prev!,
+                prompt_text: lobbyQuery.data.room.prompt_text,
+                state: lobbyQuery.data.room.status,
+            }));
+        }
+    }, [lobbyQuery.data]);
 
     // Countdown Logic for Overlays
     const [countdownTime, setCountdownTime] = useState(3);

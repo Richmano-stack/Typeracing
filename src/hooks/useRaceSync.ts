@@ -9,6 +9,7 @@ interface SyncParams {
   userId: string | null;
   currentProgress: number;
   currentWpm: number;
+  enabled?: boolean;
 }
 
 interface SyncResponse {
@@ -20,7 +21,7 @@ interface SyncResponse {
   winnerId: string | null;
 }
 
-export function useRaceSync({ roomId, userId, currentProgress, currentWpm }: SyncParams) {
+export function useRaceSync({ roomId, userId, currentProgress, currentWpm, enabled = true }: SyncParams) {
   const router = useRouter();
   const setGameState = useRaceStore((state) => state.setGameState);
 
@@ -56,7 +57,7 @@ export function useRaceSync({ roomId, userId, currentProgress, currentWpm }: Syn
 
       return res.json();
     },
-    refetchInterval: 500,
+    refetchInterval: enabled ? 500 : false,
     refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       if (error.message === '404' || error.message === '403') {
@@ -65,7 +66,7 @@ export function useRaceSync({ roomId, userId, currentProgress, currentWpm }: Syn
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff for 500 errors
-    enabled: !!roomId && !!userId,
+    enabled: !!roomId && !!userId && enabled,
   });
 
   // Handle side-effects for errors

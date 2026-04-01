@@ -65,6 +65,7 @@ export async function GET(
       host_id: roomData.host_id,
       guest_id: roomData.guest_id,
       status: roomData.state,
+      is_host_ready: roomData.host_ready,
       is_guest_ready: roomData.guest_ready,
       target_start_ms: roomData.target_start_ms,
       prompt_text: roomData.prompt_text,
