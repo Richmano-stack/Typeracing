@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 
-export type GameState = 'LOBBY' | 'COUNTDOWN' | 'IN_PROGRESS' | 'FINISHED' | 'ABANDONED';
+export type GameState = 
+  | 'LOBBY' 
+  | 'WAITING_FOR_GUEST' 
+  | 'LOBBY_FULL' 
+  | 'READY_CHECK' 
+  | 'COUNTDOWN' 
+  | 'IN_PROGRESS' 
+  | 'FINISHED' 
+  | 'ABANDONED';
+
+export type PersistenceStatus = 'IDLE' | 'SAVING' | 'SAVED' | 'ALREADY_SAVED' | 'ERROR';
 
 export interface RaceState {
   // Room Metadata
@@ -8,6 +18,11 @@ export interface RaceState {
   targetStartMs: number | null;
   state: GameState;
   clockOffsetMs: number | null;
+  role: 'host' | 'guest' | null;
+  hostReady: boolean;
+  guestReady: boolean;
+  opponentName: string | null;
+  persistenceStatus: PersistenceStatus;
 
   // Local Player State
   localProgress: number; // 0-100
@@ -37,6 +52,11 @@ const initialState: RaceState = {
   targetStartMs: null,
   state: 'LOBBY',
   clockOffsetMs: null,
+  role: null,
+  hostReady: false,
+  guestReady: false,
+  opponentName: null,
+  persistenceStatus: 'IDLE',
 
   localProgress: 0,
   localWpm: 0,
