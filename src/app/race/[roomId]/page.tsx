@@ -6,12 +6,11 @@ import { authClient } from "@/lib/auth-client";
 import { useRaceSync } from '@/hooks/useRaceSync';
 import { useLobbyPolling } from '@/hooks/useLobbyPolling';
 import { useRaceStore } from '@/store/useRaceStore';
-import { TypeInput } from '@/components/game/TypeInput';
-import { GhostCar } from '@/components/game/GhostCar';
-import { PlayerCar } from '@/components/game/PlayerCar';
-import ResultsModal from '@/components/ResultsModal';
-import { Copy, Loader2, Play } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { LobbyPhase } from './_components/LobbyPhase';
+import { RacePhase } from './_components/RacePhase';
+import { ResultsPhase } from './_components/ResultsPhase';
 
 interface RoomData {
   prompt_text: string;
@@ -50,11 +49,13 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
       gameState === 'LOBBY_FULL' || 
       gameState === 'READY_CHECK';
 
+    const isFinished = gameState === 'FINISHED';
+
     // Phase 2 hook: active during lobby only
     const lobbyQuery = useLobbyPolling({
       roomId,
       userId,
-      enabled: isLobbyPhase,
+      enabled: false, // Disabled for this step as requested
     });
 
     // Phase 4 hook: active during race only
@@ -63,13 +64,27 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
       userId,
       currentProgress: localProgress,
       currentWpm: localWpm,
-      enabled: !isLobbyPhase && gameState !== 'FINISHED',
+      enabled: false, // Disabled for this step as requested
     });
 
     // Initial Rehydration (Only if not already set or lobby needs it)
     useEffect(() => {
         if (!roomId || !isLobbyPhase) return;
         
+        // Debug Bypass
+        if (roomId === 'test') {
+            setRoomData({
+                prompt_text: "Debug bypass prompt text.",
+                state: "WAITING_FOR_GUEST",
+                target_start_ms: null,
+                host_id: "test",
+                guest_id: null,
+            });
+            setGameState({ state: 'WAITING_FOR_GUEST' });
+            setIsRoomLoading(false);
+            return;
+        }
+
         const initRoom = async () => {
             try {
                 const res = await fetch(`/api/race/${roomId}`);
@@ -80,6 +95,8 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
                         state: data.room.state,
                         targetStartMs: data.room.target_start_ms 
                     });
+                } else if (res.status === 404) {
+                    router.push('/dashboard');
                 }
             } catch (error) {
                 console.error("Initial rehydration failed", error);
@@ -91,51 +108,19 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
         if (isRoomLoading) {
             initRoom();
         }
-    }, [roomId, isLobbyPhase, isRoomLoading, setGameState]);
+    }, [roomId, isLobbyPhase, isRoomLoading, setGameState, router]);
 
     // Keep local roomData in sync for prompt_text
     useEffect(() => {
-        if (lobbyQuery.data?.room.prompt_text) {
-            setRoomData((prev) => ({
-                ...prev!,
+        if (roomId !== 'test' && lobbyQuery.data?.room?.prompt_text) {
+            setRoomData((prev) => prev ? ({
+                ...prev,
                 prompt_text: lobbyQuery.data.room.prompt_text,
                 state: lobbyQuery.data.room.status,
-            }));
+            }) : null);
         }
-    }, [lobbyQuery.data]);
+    }, [lobbyQuery.data, roomId]);
 
-    // Countdown Logic for Overlays
-    const [countdownTime, setCountdownTime] = useState(3);
-
-    useEffect(() => {
-        if (gameState !== 'COUNTDOWN' || !targetStartMs || clockOffsetMs === null) return;
-
-        let frameId: number;
-        
-        const updateCountdown = () => {
-            const serverNow = Date.now() + clockOffsetMs;
-            const remainingSec = Math.ceil((targetStartMs - serverNow) / 1000);
-            
-            if (remainingSec >= 0) {
-                setCountdownTime(remainingSec);
-            }
-            
-            frameId = requestAnimationFrame(updateCountdown);
-        };
-
-        frameId = requestAnimationFrame(updateCountdown);
-        return () => cancelAnimationFrame(frameId);
-    }, [gameState, targetStartMs, clockOffsetMs]);
-
-    // Invite Link Copy
-    const handleCopyInvite = () => {
-        const url = `${window.location.origin}/race/${roomId}`;
-        navigator.clipboard.writeText(url).then(() => {
-            toast.success("Invite link copied to clipboard");
-        }).catch(() => {
-            toast.error("Failed to copy link");
-        });
-    };
 
     if (isSessionLoading || isRoomLoading) {
         return (
@@ -148,92 +133,42 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
 
     if (!roomData) return null; // Wait for room logic to redirect
 
-    // Derive mock Results for MVP until backend /result route is implemented
-    const isFinished = gameState === 'FINISHED';
-    const mockResults = isFinished ? {
-        wpm: localWpm,
-        accuracy: 100, // Derived accuracy logic could be added
-        durationMs: 0,
-        saved: !!userId,
-        authenticated: !!userId
-    } : null;
+    const renderPhase = () => {
+        if (isLobbyPhase) return <LobbyPhase />;
+        if (isFinished) return <ResultsPhase />;
+        return <RacePhase />;
+    };
 
     return (
         <div className="min-h-[calc(100vh-4rem)] bg-[#050505] text-white flex flex-col items-center pt-24 px-4 overflow-x-hidden font-mono relative mt-16">
-            <div className="w-full max-w-5xl relative z-10 flex flex-col gap-6">
-                
-                {/* Header Info */}
-                <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-xl p-4 px-6 shadow-inner">
-                    <div className="flex items-center gap-4">
-                        <div className="py-1 px-3 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded text-xs font-black tracking-widest uppercase">
-                            VS MODE
-                        </div>
-                        <span className="font-mono text-white/50 text-sm">ROOM: {roomId}</span>
-                    </div>
-                </div>
+            {renderPhase()}
 
-                {/* Game Board (Tracks) */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
-                    {/* Ghost Car (Opponent) */}
-                    <GhostCar opponentName="Opponent" />
-
-                    {/* Player Car */}
-                    <PlayerCar />
-                </div>
-
-                {/* Type Input Area */}
-                <div className="mt-4">
-                     <TypeInput promptText={roomData.prompt_text} />
-                </div>
-            </div>
-
-            {/* OVERLAYS */}
-
-            {/* 1. LOBBY_WAITING */}
-            {gameState === 'LOBBY' && (
-                <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-lg flex items-center justify-center pt-16">
-                    <div className="bg-[#0f0f0f] border border-[#00f3ff]/30 p-8 rounded-2xl flex flex-col items-center max-w-sm w-full shadow-[0_0_50px_rgba(0,243,255,0.1)]">
-                        <Loader2 className="w-12 h-12 text-[#00f3ff] animate-spin mb-6" />
-                        <h2 className="text-2xl font-black uppercase tracking-tighter mb-2 text-center text-white">Awaiting Opponent</h2>
-                        <p className="text-white/50 text-sm mb-8 text-center">Share the link below to invite a challenger to this duel instance.</p>
-                        
-                        <button 
-                            onClick={handleCopyInvite}
-                            className="w-full flex items-center justify-center gap-2 bg-[#00f3ff]/10 hover:bg-[#00f3ff]/20 text-[#00f3ff] border border-[#00f3ff]/30 transition-colors py-3 px-6 rounded-lg font-bold tracking-widest uppercase text-sm"
-                        >
-                            <Copy className="w-4 h-4" />
-                            Copy Invite Link
-                        </button>
-                    </div>
+            {roomId === 'test' && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-[#00f3ff]/30 p-4 rounded-xl shadow-[0_0_20px_rgba(0,243,255,0.2)] flex gap-4 z-50 backdrop-blur-sm">
+                    <button 
+                        onClick={() => setGameState({ state: 'WAITING_FOR_GUEST' })} 
+                        className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-mono text-sm"
+                    >
+                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                        Lobby
+                    </button>
+                    <button 
+                        onClick={() => setGameState({ state: 'COUNTDOWN' })} 
+                        className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-mono text-sm"
+                    >
+                        <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                        Race
+                    </button>
+                    <button 
+                        onClick={() => setGameState({ state: 'FINISHED' })} 
+                        className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-mono text-sm"
+                    >
+                        <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                        Results
+                    </button>
                 </div>
             )}
-
-            {/* 2. COUNTDOWN */}
-            {gameState === 'COUNTDOWN' && (
-                <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center pt-16">
-                    <div className="animate-in zoom-in slide-in-from-bottom-4 duration-300 flex items-center justify-center">
-                        {countdownTime > 0 ? (
-                            <div className="text-[12rem] font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/20 animate-pulse drop-shadow-[0_0_40px_rgba(255,255,255,0.3)] select-none pointer-events-none">
-                                {countdownTime}
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-6 text-[#00f3ff] animate-[pulse_0.5s_ease-in-out_infinite] scale-150 drop-shadow-[0_0_60px_rgba(0,243,255,0.6)] select-none pointer-events-none">
-                                <Play className="w-24 h-24 fill-[#00f3ff]" />
-                                <span className="text-8xl font-black tracking-tighter uppercase italic pr-8">GO!</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* 3. FINISHED (Result Modal) */}
-            <ResultsModal 
-                isOpen={isFinished} 
-                isLoading={false} 
-                results={mockResults} 
-                onReset={() => router.push('/dashboard')} 
-            />
-
         </div>
     );
 }
+

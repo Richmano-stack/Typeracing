@@ -71,7 +71,7 @@ const HeaderAuthenticated: React.FC<HeaderAuthenticatedProps> = ({ user }) => {
         });
     };
 
-    const isDashboard = pathname === '/dashboard';
+    const isDashboard = pathname === '/';
 
     return (
         <header
