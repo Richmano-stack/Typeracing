@@ -2,9 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Play, Users, Brain, TrendingUp, Zap, Terminal } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Play, Users, Brain, TrendingUp, Zap, Terminal, Loader2 } from 'lucide-react';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberCard from '@/components/ui/CyberCard';
+import { multiplayerApi } from '@/services/multiplayerApi';
+import { toast } from 'sonner';
 
 const actionCards = [
   {
@@ -20,11 +23,30 @@ const actionCards = [
     href: '#',
     icon: Users,
     isPrimary: false,
-    isLocked: true,
+    isLocked: false,
   },
 ];
 
 const HeroSection: React.FC = () => {
+    const router = useRouter();
+    const [isCreating, setIsCreating] = React.useState(false);
+
+    const handleCreateRoom = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (isCreating) return;
+
+        setIsCreating(true);
+        const toastId = toast.loading("Initializing private protocol...");
+        try {
+            const { roomId } = await multiplayerApi.createRoom();
+            toast.success("Lobby encrypted and ready.", { id: toastId });
+            router.push(`/race/${roomId}`);
+        } catch (error: any) {
+            toast.error(error.message || "Protocol failure.", { id: toastId });
+            setIsCreating(false);
+        }
+    };
+
   return (
     <section className="min-h-screen flex flex-col items-center justify-center pt-20 pb-20 px-4 text-center relative z-10">
 
@@ -83,7 +105,13 @@ const HeroSection: React.FC = () => {
             key={card.title} 
             href={card.href} 
             className={`group ${card.isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={(e) => card.isLocked && e.preventDefault()}
+            onClick={(e) => {
+                if (card.isLocked) {
+                    e.preventDefault();
+                } else if (card.title === 'PRIVATE_LOBBY') {
+                    handleCreateRoom(e);
+                }
+            }}
           >
             <CyberCard className="h-full transition-transform duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_0_30px_rgba(0,243,255,0.1)]">
               <div className="flex flex-col items-center text-center h-full relative">
@@ -93,7 +121,7 @@ const HeroSection: React.FC = () => {
                     </div>
                 )}
                 <div className={`p-4 rounded-full mb-4 ${card.isPrimary ? 'bg-[var(--primary)] text-black' : 'bg-[rgba(255,255,255,0.05)] text-[var(--primary)]'}`}>
-                  <card.icon size={32} />
+                  {isCreating && card.title === 'PRIVATE_LOBBY' ? <Loader2 size={32} className="animate-spin" /> : <card.icon size={32} />}
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-wider text-white mb-2">
                   {card.title}

@@ -25,7 +25,7 @@ export function useLobbyPolling({ roomId, userId, enabled }: LobbyPollingParams)
         if (state === 'COUNTDOWN' || state === 'IN_PROGRESS' || state === 'FINISHED') {
             return false;
         }
-        return enabled ? 2500 : false;
+        return enabled ? 1000 : false;
     },
     refetchIntervalInBackground: false,
     retry: 3,
@@ -38,12 +38,17 @@ export function useLobbyPolling({ roomId, userId, enabled }: LobbyPollingParams)
       // Calculate clock offset (Authoritative Server Time - Client Local Time)
       const clockOffsetMs = serverNowMs - Date.now();
 
+      // Identity Mapping: Who is my opponent?
+      const isHost = room.host_id === userId;
+      const opponentId = isHost ? room.guest_id : room.host_id;
+
       setGameState({
         state: room.status as any,
         hostReady: room.is_host_ready,
         guestReady: room.is_guest_ready,
         targetStartMs: room.target_start_ms,
         clockOffsetMs,
+        opponentName: opponentId, // Sync opponent identity
         // Sync opponent ID for UI cards if guest just joined
         opponentProgress: 0, // Reset on lobby sync to be safe
       });

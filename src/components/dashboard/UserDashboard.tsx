@@ -2,9 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Swords, Zap } from 'lucide-react';
+import { Swords, Zap, Loader2 } from 'lucide-react';
 import CyberButton from '@/components/ui/CyberButton';
 import { User } from '@prisma/client';
+import { useRouter } from 'next/navigation';
+import { multiplayerApi } from '@/services/multiplayerApi';
+import { toast } from 'sonner';
 
 interface UserDashboardProps {
     user: User & {
@@ -28,6 +31,25 @@ interface UserDashboardProps {
 }
 
 const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces }) => {
+    const router = useRouter();
+    const [isCreating, setIsCreating] = React.useState(false);
+
+    const handleCreateRoom = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (isCreating) return;
+
+        setIsCreating(true);
+        const toastId = toast.loading("Initializing private protocol...");
+        try {
+            const { roomId } = await multiplayerApi.createRoom();
+            toast.success("Lobby encrypted and ready.", { id: toastId });
+            router.push(`/race/${roomId}`);
+        } catch (error: any) {
+            toast.error(error.message || "Protocol failure.", { id: toastId });
+            setIsCreating(false);
+        }
+    };
+
     return (
         <div className="min-h-screen p-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-6xl mx-auto space-y-6">
@@ -49,12 +71,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, stats, recentRaces 
                                 <span>Solo Protocol</span>
                             </CyberButton>
                         </Link>
-                        <Link href="#">
-                            <CyberButton variant="secondary" size="lg" className="opacity-50 cursor-not-allowed">
-                                <Swords size={20} />
+                        <Link href="#" onClick={handleCreateRoom}>
+                            <CyberButton variant="secondary" size="lg">
+                                {isCreating ? <Loader2 size={20} className="animate-spin" /> : <Swords size={20} />}
                                 <span className="flex items-center">
                                     Private Lobby
-                                    <span className="ml-2 text-[10px] bg-[rgba(0,243,255,0.1)] px-1 rounded border border-[var(--primary)] text-[var(--primary)] font-mono tracking-tighter">(COMING_SOON)</span>
                                 </span>
                             </CyberButton>
                         </Link>

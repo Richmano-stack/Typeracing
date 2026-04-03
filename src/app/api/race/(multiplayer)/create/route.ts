@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerTimeMs } from "@/lib/multiplayer/server-time";
 import { getRandomQuote } from "@/lib/multiplayer/content-service";
 import { initialize } from "@/lib/multiplayer/redis-room-service";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +21,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST() {
   try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
     const roomId = crypto.randomUUID().slice(0, 8);
-    const hostId = crypto.randomUUID();
+    const hostId = session?.user?.id || crypto.randomUUID();
 
     // Fetch a random prompt from the database
     const prompt = await getRandomQuote();
