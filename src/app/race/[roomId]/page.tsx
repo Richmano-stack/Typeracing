@@ -28,12 +28,27 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
     // Local State for Room Rehydration
     const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [isRoomLoading, setIsRoomLoading] = useState(true);
+    const [persistentGuestId, setPersistentGuestId] = useState<string | null>(null);
 
-    const userId = session?.user?.id || null;
+    // Consolidated User Identity
+    const userId = session?.user?.id || persistentGuestId;
+
+    // Handle Persistent Guest Identity for Session
+    useEffect(() => {
+        if (!session?.user?.id) {
+            let gid = localStorage.getItem('typeracing_guest_id');
+            if (!gid) {
+                gid = `guest-${crypto.randomUUID()}`;
+                localStorage.setItem('typeracing_guest_id', gid);
+            }
+            setPersistentGuestId(gid);
+        }
+    }, [session?.user?.id]);
 
     // Zustand Game State
     const { 
         state: gameState, 
+        role,
         targetStartMs, 
         clockOffsetMs, 
         localProgress, 
@@ -55,7 +70,7 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
     const lobbyQuery = useLobbyPolling({
       roomId,
       userId,
-      enabled: false, // Disabled for this step as requested
+      enabled: isLobbyPhase,
     });
 
     // Phase 4 hook: active during race only
@@ -105,10 +120,26 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
             }
         };
 
-        if (isRoomLoading) {
+        if (isRoomLoading && userId) {
             initRoom();
         }
-    }, [roomId, isLobbyPhase, isRoomLoading, setGameState, router]);
+    }, [roomId, isLobbyPhase, isRoomLoading, setGameState, router, userId]);
+
+    // Identity Assignment: determine role once roomData is available
+    useEffect(() => {
+        if (!roomData) return;
+
+        // Test bypass: always treat as host when using the debug room
+        if (roomId === 'test') {
+            setGameState({ role: 'host' });
+            return;
+        }
+
+        if (!userId) return;
+
+        const assignedRole = roomData.host_id === userId ? 'host' : 'guest';
+        setGameState({ role: assignedRole });
+    }, [roomData, userId, roomId, setGameState]);
 
     // Keep local roomData in sync for prompt_text
     useEffect(() => {
@@ -134,7 +165,7 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
     if (!roomData) return null; // Wait for room logic to redirect
 
     const renderPhase = () => {
-        if (isLobbyPhase) return <LobbyPhase />;
+        if (isLobbyPhase) return <LobbyPhase roomId={roomId} userId={userId} />;
         if (isFinished) return <ResultsPhase />;
         return <RacePhase />;
     };
