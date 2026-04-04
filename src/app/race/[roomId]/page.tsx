@@ -73,13 +73,13 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
       enabled: isLobbyPhase,
     });
 
-    // Phase 4 hook: active during race only
+    // Phase 4 hook: active during race only (COUNTDOWN, IN_PROGRESS)
     useRaceSync({
       roomId,
       userId,
       currentProgress: localProgress,
       currentWpm: localWpm,
-      enabled: false, // Disabled for this step as requested
+      enabled: !isLobbyPhase && !isFinished && userId !== null,
     });
 
     // Initial Rehydration (Only if not already set or lobby needs it)
@@ -184,18 +184,26 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
                         Lobby
                     </button>
                     <button 
-                        onClick={() => setGameState({ state: 'COUNTDOWN' })} 
+                        onClick={() => {
+                            // Manual Trigger for Countdown
+                            const start = Date.now() + 10000;
+                            setGameState({ 
+                                state: 'COUNTDOWN',
+                                targetStartMs: start,
+                                clockOffsetMs: 0
+                            });
+                        }} 
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-mono text-sm"
                     >
                         <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                        Race
+                        Countdown
                     </button>
                     <button 
                         onClick={() => setGameState({ state: 'FINISHED' })} 
                         className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-lg hover:bg-slate-700 flex items-center gap-2 font-mono text-sm"
                     >
                         <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                        Results
+                        Finished
                     </button>
                 </div>
             )}
