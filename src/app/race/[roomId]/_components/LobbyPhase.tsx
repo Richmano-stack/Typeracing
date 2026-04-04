@@ -368,11 +368,30 @@ function ReadyButton({
     try {
       const res = await multiplayerApi.readyUp(roomId, userId);
       console.log('[ReadyButton] Ready-up success:', res);
-      // Optimistically mark ourselves as ready in the store
-      // (polling will confirm within 1 second)
-      setGameState(role === 'host' ? { hostReady: true, isReady: true } : { guestReady: true, isReady: true });
+      
+      const bothReady = res.room.host_ready && res.room.guest_ready;
+
+      if (bothReady) {
+        console.log('[ReadyButton] Both ready! Triggering race start...');
+        const startRes = await multiplayerApi.startRace(roomId, userId);
+        
+        // Calculate clock offset based on server time
+        const clockOffset = startRes.serverNowMs - Date.now();
+        
+        setGameState({
+          state: 'COUNTDOWN' as any,
+          targetStartMs: startRes.targetStartMs,
+          clockOffsetMs: clockOffset,
+          hostReady: true,
+          guestReady: true,
+          isReady: true,
+        });
+      } else {
+        // Optimistic sync for partial ready
+        setGameState(role === 'host' ? { hostReady: true, isReady: true } : { guestReady: true, isReady: true });
+      }
     } catch (err: any) {
-      console.error('[ReadyButton] Ready-up failed:', err);
+      console.error('[ReadyButton] Ready-up/Start failed:', err);
       setError(err?.message ?? 'Failed to ready up – try again.');
     } finally {
       setIsPending(false);
