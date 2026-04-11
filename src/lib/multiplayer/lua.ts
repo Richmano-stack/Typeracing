@@ -267,7 +267,7 @@ export const LUA_SCRIPTS = {
 
     -- 7. Return Pulse Data
     local opponentData = redis.call('HMGET', key, opponentRole .. '_progress', opponentRole .. '_wpm')
-    return state .. ':' .. (winnerId or '') .. ':' .. (opponentData[1] or '0') .. ':' .. (opponentData[2] or '0') .. ':' .. tostring(targetStartMs)
+    return state .. ':' .. (winnerId or '') .. ':' .. (opponentData[1] or '0') .. ':' .. (opponentData[2] or '0') .. ':' .. tostring(targetStartMs) .. ':' .. (promptText or '')
   `
 };
 

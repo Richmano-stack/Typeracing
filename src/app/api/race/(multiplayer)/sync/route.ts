@@ -56,6 +56,7 @@ export async function POST(req: Request) {
           opponentProgress: result.opponentProgress,
           opponentWpm: result.opponentWpm,
           winnerId: result.winnerId || null,
+          promptText: result.promptText,
         }, { status: 200 });
 
       default:

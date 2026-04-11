@@ -82,9 +82,9 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
       enabled: !isLobbyPhase && !isFinished && userId !== null,
     });
 
-    // Initial Rehydration (Only if not already set or lobby needs it)
+    // Initial Rehydration (Only if not already set)
     useEffect(() => {
-        if (!roomId || !isLobbyPhase) return;
+        if (!roomId) return;
         
         // Debug Bypass
         if (roomId === 'test') {
@@ -108,7 +108,8 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
                     setRoomData(data.room);
                     setGameState({ 
                         state: data.room.state,
-                        targetStartMs: data.room.target_start_ms 
+                        targetStartMs: data.room.target_start_ms,
+                        promptText: data.room.prompt_text
                     });
                 } else if (res.status === 404) {
                     router.push('/dashboard');
@@ -123,7 +124,7 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
         if (isRoomLoading && userId) {
             initRoom();
         }
-    }, [roomId, isLobbyPhase, isRoomLoading, setGameState, router, userId]);
+    }, [roomId, isRoomLoading, setGameState, router, userId]);
 
     // Identity Assignment: determine role once roomData is available
     useEffect(() => {
@@ -167,7 +168,7 @@ export default function RacePage({ params }: { params: Promise<{ roomId: string 
     const renderPhase = () => {
         if (isLobbyPhase) return <LobbyPhase roomId={roomId} userId={userId} />;
         if (isFinished) return <ResultsPhase />;
-        return <RacePhase />;
+        return <RacePhase roomId={roomId} userId={userId} />;
     };
 
     return (

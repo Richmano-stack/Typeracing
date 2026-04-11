@@ -51,6 +51,7 @@ export function useLobbyPolling({ roomId, userId, enabled }: LobbyPollingParams)
         opponentName: opponentId, // Sync opponent identity
         // Sync opponent ID for UI cards if guest just joined
         opponentProgress: 0, // Reset on lobby sync to be safe
+        promptText: room.prompt_text,
       });
     }
   }, [query.data, enabled, setGameState]);

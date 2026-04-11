@@ -19,6 +19,7 @@ interface SyncResponse {
   opponentProgress: number | string;
   opponentWpm: number | string;
   winnerId: string | null;
+  promptText?: string;
 }
 
 export function useRaceSync({ roomId, userId, currentProgress, currentWpm, enabled = true }: SyncParams) {
@@ -95,6 +96,7 @@ export function useRaceSync({ roomId, userId, currentProgress, currentWpm, enabl
         opponentWpm: Number(data.opponentWpm) || 0,
         winnerId: data.winnerId,
         clockOffsetMs,
+        promptText: data.promptText,
       });
     }
   }, [query.data, setGameState]);
