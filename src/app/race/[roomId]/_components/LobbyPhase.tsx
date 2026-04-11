@@ -52,6 +52,7 @@ export function LobbyPhase({ roomId, userId }: LobbyPhaseProps) {
           opponentName: res.room.host_id, // For Guest, the host is the opponent
           hostReady: res.room.host_ready,
           guestReady: res.room.guest_ready,
+          promptText: res.room.prompt_text,
         });
       })
       .catch((err) => {

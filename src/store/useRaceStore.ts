@@ -37,6 +37,7 @@ export interface RaceState {
 
   // Result State
   winnerId: string | null;
+  promptText: string | null;
 }
 
 export interface RaceActions {
@@ -68,6 +69,7 @@ const initialState: RaceState = {
   opponentLastActive: null,
 
   winnerId: null,
+  promptText: null,
 };
 
 export const useRaceStore = create<RaceStore>((set) => ({
