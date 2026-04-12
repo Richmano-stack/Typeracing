@@ -32,7 +32,11 @@ export function useLobbyPolling({ roomId, userId, enabled }: LobbyPollingParams)
   });
 
   useEffect(() => {
-    if (query.data && enabled) {
+    // Note: `enabled` is intentionally NOT checked here.
+    // When the heartbeat delivers COUNTDOWN, `enabled` flips false simultaneously
+    // with `query.data` updating. Checking `enabled` would silently drop the
+    // final payload — including `promptText` — right before RacePhase mounts.
+    if (query.data) {
       const { room, serverNowMs } = query.data;
       
       // Calculate clock offset (Authoritative Server Time - Client Local Time)
@@ -49,12 +53,11 @@ export function useLobbyPolling({ roomId, userId, enabled }: LobbyPollingParams)
         targetStartMs: room.target_start_ms,
         clockOffsetMs,
         opponentName: opponentId, // Sync opponent identity
-        // Sync opponent ID for UI cards if guest just joined
         opponentProgress: 0, // Reset on lobby sync to be safe
         promptText: room.prompt_text,
       });
     }
-  }, [query.data, enabled, setGameState]);
+  }, [query.data, setGameState]);
 
   return query;
 }

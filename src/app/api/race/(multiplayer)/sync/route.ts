@@ -18,14 +18,15 @@ export async function POST(req: Request) {
     });
     
     const body = await req.json();
-    const { roomId, guestId, progress, wpm } = body;
+    // Accept `userId` (sent by useRaceSync) or `guestId` (legacy key) for guest identity
+    const { roomId, userId: bodyUserId, guestId, progress, wpm } = body;
 
     if (!roomId) {
       return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
     }
 
-    // Identify requester: Session user or guestId UUID
-    const userId = session?.user?.id || guestId;
+    // Identify requester: Session user > bodyUserId (useRaceSync) > guestId (legacy)
+    const userId = session?.user?.id || bodyUserId || guestId;
     if (!userId) {
       return NextResponse.json({ error: "Identity required" }, { status: 401 });
     }
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
           opponentWpm: result.opponentWpm,
           winnerId: result.winnerId || null,
           promptText: result.promptText,
+          opponentFinished: result.opponentFinished || false,
         }, { status: 200 });
 
       default:

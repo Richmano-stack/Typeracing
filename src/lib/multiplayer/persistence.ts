@@ -6,14 +6,17 @@ import { RaceData } from "./types";
 /**
  * handleMultiplayerPersistence
  * 
- * Atomically locks the persistence event for a room and commits 
- * both players' results to the Postgres database if they have finished.
+ * Atomically locks the persistence event for a specific participant in a room 
+ * and commits their results to the Postgres database.
  */
-export async function handleMultiplayerPersistence(roomId: string, raceData: RaceData) {
+export async function handleMultiplayerPersistence(roomId: string, raceData: RaceData, userId: string) {
   const roomKey = `race:${roomId}`;
 
-  // 1. Atomic Lock check (Ensures only one 'Pulse' call saves the data)
-  const canPersist = await redis.eval(LUA_SCRIPTS.PERSIST_LOCK, [roomKey], []) as number;
+  const role = userId === raceData.host_id ? "host" : (userId === raceData.guest_id ? "guest" : null);
+  if (!role) return { success: false, reason: "UNAUTHORIZED" };
+
+  // 1. Atomic Lock check (Ensures participant only saves the data once)
+  const canPersist = await redis.eval(LUA_SCRIPTS.INDIVIDUAL_PERSIST_LOCK, [roomKey], [role]) as number;
   
   if (canPersist === 0) {
     // Already persisted or another process is handling it
@@ -21,28 +24,16 @@ export async function handleMultiplayerPersistence(roomId: string, raceData: Rac
   }
 
   try {
-    const results = [];
-
-    // 2. Prepare participant data (Host and Guest)
-    const participants = [
-      { 
-        id: raceData.host_id, 
-        role: "host", 
-        wpm: raceData.host_wpm, 
-        finishedAt: raceData.host_finished_ms 
-      },
-      { 
-        id: raceData.guest_id, 
-        role: "guest", 
-        wpm: raceData.guest_wpm, 
-        finishedAt: raceData.guest_finished_ms 
-      }
-    ];
+    const p = {
+      id: userId,
+      role: role,
+      wpm: role === "host" ? raceData.host_wpm : raceData.guest_wpm,
+      finishedAt: role === "host" ? raceData.host_finished_ms : raceData.guest_finished_ms
+    };
 
     // 3. Database Transaction
     await prisma.$transaction(async (tx) => {
-      for (const p of participants) {
-        if (!p.id) continue;
+        if (!p.id) return;
 
         // Check if the participant ID is a valid user in our DB
         // (BetterAuth uses UUIDs for IDs)
@@ -81,7 +72,6 @@ export async function handleMultiplayerPersistence(roomId: string, raceData: Rac
             }
           });
         }
-      }
     });
 
     return { success: true };

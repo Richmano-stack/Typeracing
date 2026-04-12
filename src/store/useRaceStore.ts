@@ -34,6 +34,7 @@ export interface RaceState {
   opponentProgress: number;
   opponentWpm: number;
   opponentLastActive: number | null;
+  opponentFinished: boolean;
 
   // Result State
   winnerId: string | null;
@@ -67,6 +68,7 @@ const initialState: RaceState = {
   opponentProgress: 0,
   opponentWpm: 0,
   opponentLastActive: null,
+  opponentFinished: false,
 
   winnerId: null,
   promptText: null,

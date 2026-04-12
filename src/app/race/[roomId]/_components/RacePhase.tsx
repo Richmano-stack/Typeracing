@@ -67,6 +67,12 @@ function RaceTrack({ localProgress, opponentProgress, gameState, timeLeft }: {
                             </div>
                         </div>
                         <span className="mt-2 text-[8px] font-mono text-[#7700ff]/60 uppercase tracking-tighter whitespace-nowrap">Opponent</span>
+                        {/* Finished Indicator */}
+                        {gameState !== 'FINISHED' && opponentProgress === 100 && (
+                             <div className="absolute -right-6 top-1/2 -translate-y-1/2 ml-2 p-1 bg-[#7700ff]/20 rounded-md animate-pulse">
+                                <Trophy className="w-3 h-3 text-[#7700ff]" />
+                             </div>
+                        )}
                     </motion.div>
                 </div>
             </div>
@@ -192,11 +198,20 @@ function TypingEngine({
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck="false"
+                disabled={localProgress >= 100}
             />
-            <div className={`w-full bg-gray-900/30 border border-white/5 rounded-3xl p-10 transition-all duration-500 ${gameState === 'COUNTDOWN' ? 'blur-md opacity-20 scale-[0.98]' : 'scale-100 opacity-100 shadow-[20px_20px_60px_rgba(0,0,0,0.4)]'}`}>
-                <div className="relative font-mono text-2xl leading-[1.8] text-justify select-none">
+            <div className={`w-full bg-gray-900/30 border border-white/5 rounded-3xl p-10 transition-all duration-500 relative ${gameState === 'COUNTDOWN' ? 'blur-md opacity-20 scale-[0.98]' : 'scale-100 opacity-100 shadow-[20px_20px_60px_rgba(0,0,0,0.4)]'}`}>
+                <div className={`relative font-mono text-2xl leading-[1.8] text-justify select-none ${localProgress >= 100 ? 'opacity-30 blur-sm pointer-events-none' : ''}`}>
                     {renderedText}
                 </div>
+                
+                {localProgress >= 100 && gameState === 'IN_PROGRESS' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-20 rounded-3xl animate-in fade-in duration-500">
+                        <Trophy className="w-12 h-12 text-yellow-400 mb-4 animate-bounce" />
+                        <span className="text-white text-xl font-medium tracking-wide">Finished!</span>
+                        <span className="text-emerald-400/80 text-sm font-mono mt-2 animate-pulse">Waiting for opponent...</span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -212,8 +227,10 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
         localProgress,
         localWpm,
         opponentProgress,
+        opponentFinished,
         promptText,
         updateLocalProgress,
+        setGameState,
     } = useRaceStore();
 
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -238,6 +255,18 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
         }, 100);
         return () => clearInterval(timer);
     }, [gameState, targetStartMs, clockOffsetMs]);
+
+    // TTL Enforcement
+    useEffect(() => {
+        if (gameState !== 'IN_PROGRESS' || !targetStartMs) return;
+        const timer = setInterval(() => {
+            const now = Date.now() + (clockOffsetMs || 0);
+            if (now - targetStartMs >= 120000) {
+                setGameState({ state: 'FINISHED' });
+            }
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [gameState, targetStartMs, clockOffsetMs, setGameState]);
 
     return (
         <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-8 relative">

@@ -29,12 +29,14 @@ export const LUA_SCRIPTS = {
   `,
 
 
-  // Ensures only the first 'Finish' event triggers the DB persistence logic
-  PERSIST_LOCK: `
+  // Used to ensure a participant only saves their results to the DB once
+  INDIVIDUAL_PERSIST_LOCK: `
     local key = KEYS[1]
-    local alreadyPersisted = redis.call('HGET', key, 'persisted_to_db')
+    local role = ARGV[1]
+    local field = role .. '_persisted_to_db'
+    local alreadyPersisted = redis.call('HGET', key, field)
     if alreadyPersisted == '1' then return 0 end
-    redis.call('HSET', key, 'persisted_to_db', '1')
+    redis.call('HSET', key, field, '1')
     return 1
   `,
 
@@ -236,9 +238,20 @@ export const LUA_SCRIPTS = {
       end
     end
 
-    -- 3. Post-Finish Lock
+    -- 3. TTL Check / Post-Finish Lock
+    if state == 'COUNTDOWN' or state == 'IN_PROGRESS' then
+      local elapsed = nowMs - targetStartMs
+      if targetStartMs > 0 and elapsed >= 120000 then
+        state = 'FINISHED'
+        redis.call('HSET', key, 'state', 'FINISHED')
+      end
+    end
+
     if state == 'FINISHED' then
-      return 'FINISHED:' .. (winnerId or '')
+      local oppData = redis.call('HMGET', key, opponentRole .. '_progress', opponentRole .. '_wpm', opponentRole .. '_finished_ms')
+      local oppFinished = '0'
+      if oppData[3] and oppData[3] ~= '' and oppData[3] ~= '0' then oppFinished = '1' end
+      return 'FINISHED:' .. (winnerId or '') .. ':' .. (oppData[1] or '0') .. ':' .. (oppData[2] or '0') .. ':' .. tostring(targetStartMs) .. ':' .. (promptText or '') .. ':' .. oppFinished
     end
 
     -- 4. Anti-Cheat (The Teleport Check)
@@ -254,20 +267,35 @@ export const LUA_SCRIPTS = {
     redis.call('HSET', key, role .. '_progress', tostring(progress), role .. '_wpm', tostring(wpm), role .. '_last_active', tostring(nowMs))
 
     -- 6. Finish Line Logic
-    if state == 'IN_PROGRESS' and progress >= 100 then
+    local roleFinished = redis.call('HGET', key, role .. '_finished_ms')
+    if state == 'IN_PROGRESS' and progress >= 100 and (not roleFinished or roleFinished == '0') then
       local field = role .. '_finished_ms'
       redis.call('HSET', key, field, tostring(nowMs))
       
       if not winnerId or winnerId == '' then
-        redis.call('HSET', key, 'winner_id', userId, 'state', 'FINISHED')
+        redis.call('HSET', key, 'winner_id', userId)
         winnerId = userId
+      end
+    end
+
+    -- Mutual Finish check
+    local dataAfter = redis.call('HMGET', key, 'host_finished_ms', 'guest_finished_ms')
+    local hf = tonumber(dataAfter[1] or '0')
+    local gf = tonumber(dataAfter[2] or '0')
+    
+    if (hf > 0 and gf > 0) then
+      if state ~= 'FINISHED' then
+        redis.call('HSET', key, 'state', 'FINISHED')
         state = 'FINISHED'
       end
     end
 
     -- 7. Return Pulse Data
-    local opponentData = redis.call('HMGET', key, opponentRole .. '_progress', opponentRole .. '_wpm')
-    return state .. ':' .. (winnerId or '') .. ':' .. (opponentData[1] or '0') .. ':' .. (opponentData[2] or '0') .. ':' .. tostring(targetStartMs) .. ':' .. (promptText or '')
+    local opponentData = redis.call('HMGET', key, opponentRole .. '_progress', opponentRole .. '_wpm', opponentRole .. '_finished_ms')
+    local oppFinished = '0'
+    if opponentData[3] and opponentData[3] ~= '' and opponentData[3] ~= '0' then oppFinished = '1' end
+    
+    return state .. ':' .. (winnerId or '') .. ':' .. (opponentData[1] or '0') .. ':' .. (opponentData[2] or '0') .. ':' .. tostring(targetStartMs) .. ':' .. (promptText or '') .. ':' .. oppFinished
   `
 };
 
