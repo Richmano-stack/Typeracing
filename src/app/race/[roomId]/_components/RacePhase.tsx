@@ -6,6 +6,7 @@ import { useRaceStore } from '@/store/useRaceStore';
 import { useRaceSync } from '@/hooks/useRaceSync';
 import { multiplayerApi } from '@/services/multiplayerApi';
 import { Zap, Trophy, Target, Gauge, MousePointer2 } from 'lucide-react';
+import { calculateRaceMetrics } from '@/lib/game/metrics';
 
 interface RacePhaseProps {
     roomId: string;
@@ -104,59 +105,67 @@ function TypingEngine({
     gameState, 
     userId, 
     roomId,
-    localProgress 
+    localProgress,
+    targetStartMs,
+    clockOffsetMs
 }: { 
     promptText: string; 
-    onProgressUpdate: (progress: number, wpm: number) => void;
+    onProgressUpdate: (progress: number, wpm: number, errors: number, accuracy: number) => void;
     gameState: string;
     userId: string | null;
     roomId: string;
     localProgress: number;
+    targetStartMs: number | null;
+    clockOffsetMs: number | null;
 }) {
     const [userInput, setUserInput] = useState('');
-    const [startTime, setStartTime] = useState<number | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const errorCountRef = useRef<number>(0);
+    const prevLengthRef = useRef<number>(0);
+    const totalStrokesRef = useRef<number>(0);
     const lastUpdateRef = useRef({ progress: 0, wpm: 0, time: 0 });
 
     useEffect(() => {
         if (gameState === 'IN_PROGRESS') {
             inputRef.current?.focus();
-            if (!startTime) setStartTime(Date.now());
         }
-    }, [gameState, startTime]);
+    }, [gameState]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (gameState !== 'IN_PROGRESS') return;
         const val = e.target.value;
         setUserInput(val);
 
-        // Instant Local Validation
-        let correctChars = 0;
-        for (let i = 0; i < val.length; i++) {
-            if (val[i] === promptText[i]) correctChars++;
-            else break;
+        // Error tracking
+        if (val.length > prevLengthRef.current) {
+            totalStrokesRef.current++;
+            if (val[val.length - 1] !== promptText[val.length - 1]) {
+                errorCountRef.current++;
+            }
         }
+        prevLengthRef.current = val.length;
 
-        const progress = Math.min(100, Math.floor((correctChars / promptText.length) * 100));
-        const now = Date.now();
-        let wpm = 0;
-        if (startTime) {
-            const elapsedMins = (now - startTime) / 60000;
-            wpm = Math.floor((correctChars / 5) / elapsedMins) || 0;
-        }
+        // Unified metrics calculation with server-synced time
+        const now = Date.now() + (clockOffsetMs || 0);
+        const durationMs = targetStartMs ? Math.max(0, now - targetStartMs) : 0;
+
+        const metrics = calculateRaceMetrics({
+            input: val,
+            prompt: promptText,
+            durationMs,
+            totalStrokes: totalStrokesRef.current,
+            totalErrors: errorCountRef.current,
+            errorBuffer: 5
+        });
 
         // Throttled Global Sync (Vibe over Math)
-        const progressChanged = progress !== lastUpdateRef.current.progress;
-        const timeToUpdateWpm = now - lastUpdateRef.current.time > 1000;
-        const isFinished = progress === 100;
+        const progressChanged = metrics.progress !== lastUpdateRef.current.progress;
+        const timeToUpdateWpm = Date.now() - lastUpdateRef.current.time > 1000;
+        const isFinished = metrics.isFinished;
 
-        if (progressChanged || (timeToUpdateWpm && wpm !== lastUpdateRef.current.wpm) || isFinished) {
-            onProgressUpdate(progress, wpm);
-            lastUpdateRef.current = { progress, wpm, time: now };
-        }
-
-        if (isFinished && localProgress < 100) {
-            multiplayerApi.saveResults(roomId, userId);
+        if (progressChanged || (timeToUpdateWpm && metrics.wpm !== lastUpdateRef.current.wpm) || isFinished) {
+            onProgressUpdate(metrics.progress, metrics.wpm, metrics.totalErrors, metrics.accuracy);
+            lastUpdateRef.current = { progress: metrics.progress, wpm: metrics.wpm, time: Date.now() };
         }
     };
 
@@ -229,8 +238,10 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
         opponentProgress,
         opponentFinished,
         promptText,
+        persistenceStatus,
         updateLocalProgress,
         setGameState,
+        saveLocalResult,
     } = useRaceStore();
 
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -256,9 +267,19 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
         return () => clearInterval(timer);
     }, [gameState, targetStartMs, clockOffsetMs]);
 
-    // TTL Enforcement
+    // TTL Enforcement & Catch-All Save
     useEffect(() => {
-        if (gameState !== 'IN_PROGRESS' || !targetStartMs) return;
+        if (!targetStartMs) return;
+
+        // Catch-all: Ensure we save if we hit FINISHED somehow (e.g. mutual finish or TTL)
+        // and haven't saved yet.
+        if (gameState === 'FINISHED' && persistenceStatus === 'IDLE') {
+            saveLocalResult(roomId, userId);
+            return;
+        }
+
+        if (gameState !== 'IN_PROGRESS') return;
+
         const timer = setInterval(() => {
             const now = Date.now() + (clockOffsetMs || 0);
             if (now - targetStartMs >= 120000) {
@@ -266,7 +287,7 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
             }
         }, 1000);
         return () => clearInterval(timer);
-    }, [gameState, targetStartMs, clockOffsetMs, setGameState]);
+    }, [gameState, targetStartMs, clockOffsetMs, setGameState, persistenceStatus, saveLocalResult, roomId, userId]);
 
     return (
         <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-8 relative">
@@ -321,6 +342,8 @@ export function RacePhase({ roomId, userId }: RacePhaseProps) {
                     userId={userId}
                     roomId={roomId}
                     localProgress={localProgress}
+                    targetStartMs={targetStartMs}
+                    clockOffsetMs={clockOffsetMs}
                 />
             ) : (
                 <div className="w-full h-48 bg-gray-900/30 border border-white/5 rounded-3xl flex flex-col items-center justify-center opacity-40">

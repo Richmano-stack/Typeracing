@@ -45,7 +45,7 @@ describe("useRaceStore", () => {
   });
 
   it("should update local progress and set localFinished", () => {
-    useRaceStore.getState().updateLocalProgress(100, 85);
+    useRaceStore.getState().updateLocalProgress(100, 85, 0, 100);
     
     const state = useRaceStore.getState();
     expect(state.localProgress).toBe(100);

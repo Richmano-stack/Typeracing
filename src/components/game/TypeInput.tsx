@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { useRaceStore } from '@/store/useRaceStore';
+import { calculateRaceMetrics } from '@/lib/game/metrics';
 
 interface TypeInputProps {
   promptText: string;
@@ -15,6 +16,9 @@ export function TypeInput({ promptText }: TypeInputProps) {
   const startTime = useRef<number | null>(null);
   const lastReportedProgress = useRef<number>(0);
   const wordIndex = useRef<number>(0);
+  const prevValueLen = useRef<number>(0);
+  const errorCountRef = useRef<number>(0);
+  const totalStrokesRef = useRef<number>(0);
 
   const state = useRaceStore((s) => s.state);
   const updateLocalProgress = useRaceStore((s) => s.updateLocalProgress);
@@ -35,6 +39,9 @@ export function TypeInput({ promptText }: TypeInputProps) {
          startTime.current = null;
          lastReportedProgress.current = 0;
          wordIndex.current = 0;
+         prevValueLen.current = 0;
+         errorCountRef.current = 0;
+         totalStrokesRef.current = 0;
          setTimeout(handleInput, 0); // Reset UI
       }
     }
@@ -49,10 +56,18 @@ export function TypeInput({ promptText }: TypeInputProps) {
       return;
     }
 
+    // Error tracking
+    if (value.length > prevValueLen.current) {
+        totalStrokesRef.current++;
+        if (value[value.length - 1] !== promptText[value.length - 1]) {
+            errorCountRef.current++;
+        }
+    }
+    prevValueLen.current = value.length;
+
     const chars = textContainerRef.current?.querySelectorAll('.prompt-char');
     if (!chars) return;
 
-    let correctCount = 0;
     let currentWordIdx = 0;
 
     for (let i = 0; i < promptText.length; i++) {
@@ -66,7 +81,6 @@ export function TypeInput({ promptText }: TypeInputProps) {
         if (i < value.length) {
             if (value[i] === promptText[i]) {
                 span.className = "prompt-char text-emerald-400";
-                correctCount++;
             } else {
                 const isSpace = promptText[i] === ' ';
                 span.className = `prompt-char text-rose-500 ${isSpace ? 'bg-rose-500/40 inline-block w-[0.5em]' : 'bg-rose-500/20'} rounded-[2px]`;
@@ -107,19 +121,26 @@ export function TypeInput({ promptText }: TypeInputProps) {
     if (state !== 'IN_PROGRESS') return;
     if (!startTime.current) startTime.current = Date.now();
     
-    const progress = (value.length / promptText.length) * 100;
-    const elapsedMinutes = (Date.now() - startTime.current) / 60000;
-    const wpm = elapsedMinutes > 0 ? (correctCount / 5) / elapsedMinutes : 0;
+    const durationMs = Date.now() - startTime.current;
+
+    const metrics = calculateRaceMetrics({
+        input: value,
+        prompt: promptText,
+        durationMs,
+        totalStrokes: totalStrokesRef.current,
+        totalErrors: errorCountRef.current,
+        errorBuffer: 5
+    });
 
     // Throttle store updates (e.g., every 1% progress or word complete or finished)
     // This avoids bombarding Zustand on every character keypress
     const isWordComplete = value[value.length - 1] === ' ';
-    const isSignificantProgress = Math.abs(progress - lastReportedProgress.current) >= 1;
-    const isFinished = value.length === promptText.length;
+    const isSignificantProgress = Math.abs(metrics.progress - lastReportedProgress.current) >= 1;
+    const isFinished = metrics.isFinished;
 
     if (isWordComplete || isSignificantProgress || isFinished) {
-        updateLocalProgress(Number(progress.toFixed(2)), Math.round(wpm));
-        lastReportedProgress.current = progress;
+        updateLocalProgress(metrics.progress, metrics.wpm, metrics.totalErrors, metrics.accuracy);
+        lastReportedProgress.current = metrics.progress;
     }
   };
 
