@@ -177,7 +177,8 @@ export async function syncPulse(
   opponentProgress?: number,
   opponentWpm?: number,
   targetStartMs?: number,
-  promptText?: string
+  promptText?: string,
+  opponentFinished?: boolean
 }> {
   const roomKey = `race:${roomId}`;
   
@@ -191,7 +192,7 @@ export async function syncPulse(
     return { status: result as any };
   }
 
-  const [state, winnerId, oppProg, oppWpm, targetStart, promptText] = result.split(':');
+  const [state, winnerId, oppProg, oppWpm, targetStart, promptText, oppFinished] = result.split(':');
   
   return {
     status: 'OK',
@@ -200,6 +201,7 @@ export async function syncPulse(
     opponentProgress: parseInt(oppProg || '0', 10),
     opponentWpm: parseInt(oppWpm || '0', 10),
     targetStartMs: parseInt(targetStart || '0', 10),
-    promptText: promptText || undefined
+    promptText: promptText || undefined,
+    opponentFinished: oppFinished === '1'
   };
 }

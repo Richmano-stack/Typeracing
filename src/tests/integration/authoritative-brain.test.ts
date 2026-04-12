@@ -138,7 +138,7 @@ describe("Authoritative Brain (Sync Service)", () => {
                     body: JSON.stringify({ roomId: ROOM_ID, guestId: HOST_ID, progress: 100, wpm: 80 })
                 });
                 const data = await res.json();
-                expect(data.state).toBe("FINISHED");
+                expect(data.state).toBe("IN_PROGRESS");
                 expect(data.winnerId).toBe(HOST_ID);
             }
         });
@@ -160,8 +160,8 @@ describe("Authoritative Brain (Sync Service)", () => {
         });
     });
 
-    it("should allow persistence only after race is FINISHED", async () => {
-        await RedisRoomService.initialize({ roomId: ROOM_ID, hostId: HOST_ID, promptId: "p", promptText: "t", nowMs: Date.now() });
+    it("should allow independent persistence even if the room is IN_PROGRESS", async () => {
+        await RedisRoomService.initialize({ roomId: ROOM_ID, hostId: HOST_ID, promptId: testPromptId, promptText: "t", nowMs: Date.now() });
         await redis.hset(`race:${ROOM_ID}`, { guest_id: GUEST_ID, state: "IN_PROGRESS" });
 
         // 1. Attempt to save while IN_PROGRESS
@@ -174,7 +174,10 @@ describe("Authoritative Brain (Sync Service)", () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ roomId: ROOM_ID, guestId: HOST_ID })
                 });
-                expect(res.status).toBe(400);
+                expect(res.status).toBe(200);
+                if (res.status === 200) {
+                    expect((await res.json()).status).toBe("SAVED");
+                }
             }
         });
 
@@ -191,7 +194,7 @@ describe("Authoritative Brain (Sync Service)", () => {
             guest_wpm: "90" 
         });
 
-        // 3. Attempt to save
+        // 3. Attempt to save again for the same user
         await testApiHandler({
             appHandler: saveRoute,
             url: "/api/race/multiplayer/save",
@@ -206,7 +209,7 @@ describe("Authoritative Brain (Sync Service)", () => {
                     throw new Error(`API_500_ERROR: ${JSON.stringify(json)}`);
                 }
                 expect(res.status).toBe(200);
-                expect((await res.json()).status).toBe("SAVED");
+                expect((await res.json()).status).toBe("ALREADY_SAVED");
             }
         });
     });

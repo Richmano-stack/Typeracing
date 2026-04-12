@@ -140,7 +140,7 @@ export function TypeInput({ promptText }: TypeInputProps) {
         type="text"
         className="absolute inset-0 w-full h-full opacity-0 cursor-text -z-10 focus:z-10"
         onInput={handleInput}
-        disabled={state !== 'IN_PROGRESS'}
+        disabled={state !== 'IN_PROGRESS' || wordIndex.current >= promptText.split(' ').length}
         autoCapitalize="none"
         autoComplete="off"
         autoCorrect="off"
@@ -183,6 +183,12 @@ export function TypeInput({ promptText }: TypeInputProps) {
       {state === 'FINISHED' && (
          <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20 transition-all">
             <span className="text-emerald-400 text-xl font-medium tracking-wide">Race Complete!</span>
+         </div>
+      )}
+      {state === 'IN_PROGRESS' && wordIndex.current >= promptText.split(' ').length && (
+         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-20 transition-all gap-2">
+            <span className="text-white text-xl font-medium tracking-wide">Finished!</span>
+            <span className="text-emerald-400/80 text-sm font-mono tracking-wide">Waiting for opponent...</span>
          </div>
       )}
     </div>

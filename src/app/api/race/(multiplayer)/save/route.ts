@@ -34,18 +34,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
-    // 2. Safety Check: Only save if state is FINISHED
-    if (roomData.state !== 'FINISHED') {
-      return NextResponse.json({ error: "Race is not finished yet" }, { status: 400 });
-    }
-
-    // 3. Security Check: Requester must be a participant
+    // 2. Security Check: Requester must be a participant
     if (userId !== roomData.host_id && userId !== roomData.guest_id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // 4. Trigger Atomic Persistence
-    const persistResult = await handleMultiplayerPersistence(roomId, roomData);
+    // 3. Trigger Atomic Persistence Check
+    const persistResult = await handleMultiplayerPersistence(roomId, roomData, userId);
 
     if (persistResult.success) {
       return NextResponse.json({ status: "SAVED" }, { status: 200 });
