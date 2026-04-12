@@ -112,11 +112,11 @@ export const multiplayerApi = {
     return handleResponse<LobbyHeartbeatResponse>(response, "Lobby heartbeat failed");
   },
 
-  async saveResults(roomId: string, userId: string | null): Promise<SaveResultsResponse> {
+  async saveResults(roomId: string, userId: string | null, accuracy?: number): Promise<SaveResultsResponse> {
     const response = await fetch("/api/race/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomId, guestId: userId }),
+      body: JSON.stringify({ roomId, guestId: userId, accuracy: accuracy ?? 100 }),
     });
     return handleResponse<SaveResultsResponse>(response, "Failed to save results");
   },

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       headers: req.headers,
     });
     
-    const { roomId, guestId } = await req.json();
+    const { roomId, guestId, accuracy } = await req.json();
 
     if (!roomId) {
       return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Trigger Atomic Persistence Check
-    const persistResult = await handleMultiplayerPersistence(roomId, roomData, userId);
+    const persistResult = await handleMultiplayerPersistence(roomId, roomData, userId, accuracy);
 
     if (persistResult.success) {
       return NextResponse.json({ status: "SAVED" }, { status: 200 });

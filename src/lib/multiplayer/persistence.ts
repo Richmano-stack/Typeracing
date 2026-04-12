@@ -9,7 +9,7 @@ import { RaceData } from "./types";
  * Atomically locks the persistence event for a specific participant in a room 
  * and commits their results to the Postgres database.
  */
-export async function handleMultiplayerPersistence(roomId: string, raceData: RaceData, userId: string) {
+export async function handleMultiplayerPersistence(roomId: string, raceData: RaceData, userId: string, accuracy?: number) {
   const roomKey = `race:${roomId}`;
 
   const role = userId === raceData.host_id ? "host" : (userId === raceData.guest_id ? "guest" : null);
@@ -54,7 +54,7 @@ export async function handleMultiplayerPersistence(roomId: string, raceData: Rac
             userId: user ? user.id : null, // Nullable for guests
             mode: "multiplayer",
             wpm: p.wpm,
-            accuracy: 100, // Default for now, or calculate if we have total chars
+            accuracy: Math.floor(accuracy ?? 100),
             duration_seconds: Math.max(0, durationSeconds),
             text_id: raceData.prompt_id,
             opponentId: opponentId,
