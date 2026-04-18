@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Github, Chrome, Mail, Lock } from 'lucide-react';
+import { Github, Chrome, Mail, Lock, CheckCircle2 } from 'lucide-react';
 import CyberCard from '@/components/ui/CyberCard';
 import CyberButton from '@/components/ui/CyberButton';
 import CyberInput from '@/components/ui/CyberInput';
 
-export default function LoginForm() {
+function LoginFormContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const resetSuccess = searchParams.get('reset_success') === '1';
+
     const [isLoading, setIsLoading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -63,6 +66,13 @@ export default function LoginForm() {
     return (
         <CyberCard>
             <form onSubmit={handleCredentialsLogin} className="space-y-4">
+                {resetSuccess && !error && (
+                    <div className="p-3 bg-green-500/10 border border-green-500/50 rounded flex items-center gap-2 text-green-400 text-sm">
+                        <CheckCircle2 size={16} className="shrink-0" />
+                        <span>Password successfully reset. Please log in with your new password.</span>
+                    </div>
+                )}
+
                 {error && (
                     <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm text-center">
                         {error}
@@ -115,12 +125,12 @@ export default function LoginForm() {
                     <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-[var(--border-primary)] opacity-30"></div>
                     </div>
-                    <div className="relative flex justify-center text-xs uppercase">
+                    {/*                     <div className="relative flex justify-center text-xs uppercase">
                         <span className="bg-[var(--background)] px-2 text-[var(--text-secondary)]">Or continue with</span>
-                    </div>
+                    </div> */}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* <div className="grid grid-cols-2 gap-3">
                     <CyberButton
                         type="button"
                         onClick={() => handleSocialLogin('google')}
@@ -143,7 +153,7 @@ export default function LoginForm() {
                         <span>GitHub</span>
                     </CyberButton>
                 </div>
-
+ */}
                 <div className="mt-6 text-center text-sm text-[var(--text-secondary)]">
                     Don't have an account?{' '}
                     <Link href="/register" className="text-[var(--primary)] hover:underline">
@@ -152,5 +162,19 @@ export default function LoginForm() {
                 </div>
             </form>
         </CyberCard>
+    );
+}
+
+export default function LoginForm() {
+    return (
+        <Suspense fallback={
+            <CyberCard>
+                <div className="flex justify-center p-8">
+                    <div className="w-8 h-8 rounded-full border-t-2 border-[var(--primary)] animate-spin"></div>
+                </div>
+            </CyberCard>
+        }>
+            <LoginFormContent />
+        </Suspense>
     );
 }
