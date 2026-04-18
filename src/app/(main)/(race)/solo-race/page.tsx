@@ -25,13 +25,14 @@ const SoloRacePage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [startTime, setStartTime] = useState<number | null>(null);
 
-    const inputRef = useRef<HTMLInputElement>(null);
+
 
     const {
         currentIndex,
         userInput,
         totalCharactersInserted,
         status,
+        isOverBufferLimit,
         handleKey,
         reset
     } = useSoloRace(text);
@@ -47,7 +48,6 @@ const SoloRacePage: React.FC = () => {
             console.error("Failed to initiate race", err);
         } finally {
             setIsLoadingText(false);
-            setTimeout(() => inputRef.current?.focus(), 100);
         }
     }, []);
 
@@ -56,7 +56,6 @@ const SoloRacePage: React.FC = () => {
     }, [initiateRace]);
 
     // 2. Start Race (Lifecycle: On Start - first keystroke)
-    // Hook handles the state change, we trigger the fire-and-forget API call
     const triggerStartApi = useCallback((id: string) => {
         raceApi.start(id).catch(err => {
             console.error("Fire-and-forget start failed", err);
@@ -71,8 +70,6 @@ const SoloRacePage: React.FC = () => {
         try {
             const data = await raceApi.finish(raceId, totalCharactersInserted);
             setResults(data);
-
-            // Invalidate user-telemetry to update the HUD
             queryClient.invalidateQueries({ queryKey: ['user-telemetry'] });
         } catch (err) {
             console.error("Failed to finish race", err);
@@ -87,59 +84,96 @@ const SoloRacePage: React.FC = () => {
         }
     }, [status, onFinish]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        const isFirst = handleKey(e.key);
-        if (isFirst && raceId) {
-            setStartTime(Date.now());
-            triggerStartApi(raceId);
-        }
-    };
+    // Global Keydown Engine: Bypassing React synthetic events for zero-latency
+    useEffect(() => {
+        if (status === 'finished' || isLoadingText || isModalOpen) return;
 
-    const isBufferFull = userInput.length >= currentIndex + 5 && currentIndex < text.length;
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Prevent scrolling on space and other defaults
+            if (e.key === ' ' || e.key === 'Backspace') {
+                e.preventDefault();
+            }
 
+            const isFirst = handleKey(e.key);
+            if (isFirst && raceId) {
+                setStartTime(Date.now());
+                triggerStartApi(raceId);
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [status, isLoadingText, isModalOpen, handleKey, raceId, triggerStartApi]);
+
+    // Word-Chunked Virtualization: O(1) word-level tracking instead of O(N) characters
     const renderedText = useMemo(() => {
         if (!text) return null;
 
-        const chars = text.split('').map((char, i) => {
-            let color = 'var(--text-muted)';
-            let backgroundColor = 'transparent';
-            let textDecoration = 'none';
+        const words = text.split(' ');
+        let charAcc = 0;
 
-            if (i < userInput.length) {
-                if (i < currentIndex) {
-                    color = NEON_GREEN;
-                } else if (i === currentIndex) {
-                    backgroundColor = BRIGHT_RED;
-                    color = 'white';
-                } else {
-                    color = DIM_RED;
-                    textDecoration = 'underline';
-                }
+        return words.map((word, wordIdx) => {
+            const isLastWord = wordIdx === words.length - 1;
+            const wordWithSpace = word + (isLastWord ? '' : ' ');
+            const wordStartIdx = charAcc;
+            const wordEndIdx = charAcc + wordWithSpace.length;
+            charAcc = wordEndIdx;
+
+            // Determine if this word is fully typed, currently typing, or future
+            const isFullyPast = currentIndex >= wordEndIdx;
+            const isCurrentlyTyping = currentIndex >= wordStartIdx && currentIndex < wordEndIdx;
+
+            if (isFullyPast) {
+                return (
+                    <span key={wordIdx} className="text-[var(--primary)] text-shadow-[0_0_2px_rgba(0,243,255,0.3)]">
+                        {wordWithSpace}
+                    </span>
+                );
             }
 
+            if (isCurrentlyTyping) {
+                return (
+                    <span key={wordIdx}>
+                        {wordWithSpace.split('').map((char, charOffset) => {
+                            const absIdx = wordStartIdx + charOffset;
+                            let color = 'var(--text-muted)';
+                            let backgroundColor = 'transparent';
+                            let textDecoration = 'none';
+
+                            if (absIdx < userInput.length) {
+                                if (absIdx < currentIndex) {
+                                    color = NEON_GREEN;
+                                } else if (absIdx === currentIndex) {
+                                    backgroundColor = BRIGHT_RED;
+                                    color = 'white';
+                                } else {
+                                    color = DIM_RED;
+                                    textDecoration = 'underline';
+                                }
+                            }
+
+                            return (
+                                <span
+                                    key={absIdx}
+                                    className="relative transition-colors duration-75"
+                                    style={{ color, backgroundColor, textDecoration }}
+                                >
+                                    {status !== 'finished' && absIdx === currentIndex && <span className="caret" />}
+                                    {char}
+                                </span>
+                            );
+                        })}
+                    </span>
+                );
+            }
+
+            // Future word
             return (
-                <span
-                    key={i}
-                    className="relative"
-                    style={{
-                        color,
-                        backgroundColor,
-                        textDecoration,
-                        transition: 'all 0.1s ease-out'
-                    }}
-                >
-                    {status !== 'finished' && i === currentIndex && <span className="caret" />}
-                    {char}
+                <span key={wordIdx} className="text-[var(--text-muted)]">
+                    {wordWithSpace}
                 </span>
             );
         });
-
-        // If we've typed everything correctly and are at the end, show caret after last char
-        if (status !== 'finished' && currentIndex === text.length) {
-            chars.push(<span key="end-caret" className="caret" />);
-        }
-
-        return chars;
     }, [text, userInput, currentIndex, status]);
 
     const handleReset = () => {
@@ -193,12 +227,12 @@ const SoloRacePage: React.FC = () => {
                 <div>
                     <h1 className="text-3xl font-black italic tracking-tighter flex items-center gap-3">
                         <Zap className="text-[var(--primary)]" fill="var(--primary)" />
-                        CYBER_RACE <span className="text-xs not-italic font-normal tracking-widest text-[var(--text-muted)] ml-2">v2.0.4-SOLO</span>
+                        CYBER_RACE <span className="text-xs not-italic font-normal tracking-widest text-[var(--text-muted)] ml-2">v3.0.0-FLOW</span>
                     </h1>
                     <div className="mt-2 flex gap-4 text-[10px] tracking-widest uppercase text-[var(--text-secondary)]">
-                        <span>LATENCY: 12ms</span>
-                        <span>KERNEL: STABLE</span>
-                        <span>BUFF_LIMIT: 5_CHAR</span>
+                        <span>LATENCY: ZERO_TARGET</span>
+                        <span>KERNEL: OPTIMIZED</span>
+                        <span>BUFF: SOFT_CHECK</span>
                     </div>
                 </div>
 
@@ -210,8 +244,8 @@ const SoloRacePage: React.FC = () => {
                     />
                     <div className="text-right">
                         <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest mb-1">Status</div>
-                        <div className={`text-sm ${isBufferFull ? 'text-[var(--error)]' : 'text-[var(--primary)]'}`}>
-                            {isBufferFull ? '!! BUFFER_FULL !!' : status === 'running' ? 'EXECUTING...' : 'IDLE_WAIT'}
+                        <div className={`text-sm ${isOverBufferLimit ? 'text-[var(--error)]' : 'text-[var(--primary)]'}`}>
+                            {isOverBufferLimit ? '!! BUFFER_OVERFLOW !!' : status === 'running' ? 'EXECUTING...' : 'IDLE_WAIT'}
                         </div>
                     </div>
                 </div>
@@ -220,11 +254,10 @@ const SoloRacePage: React.FC = () => {
             {/* Main Terminal Area */}
             <div className="relative w-full max-w-4xl">
                 <div
-                    onClick={() => inputRef.current?.focus()}
                     className={`
                         relative p-10 md:p-14 cyber-card
                         text-2xl md:text-3xl leading-relaxed transition-all duration-300
-                        ${isBufferFull ? 'buffer-full' : ''}
+                        ${isOverBufferLimit ? 'buffer-full' : ''}
                     `}
                 >
                     {/* Scanline Effect */}
@@ -233,25 +266,13 @@ const SoloRacePage: React.FC = () => {
                     <div className="relative z-20 break-words">
                         {renderedText}
                     </div>
-
-                    {/* Hidden Input field */}
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        className="absolute inset-0 opacity-0 cursor-default"
-                        value={userInput}
-                        onKeyDown={handleKeyDown}
-                        onChange={() => { }}
-                        readOnly={status === 'finished'}
-                        autoFocus
-                    />
                 </div>
 
                 {/* Warning HUD */}
-                {isBufferFull && (
-                    <div className="mt-6 flex items-center justify-center gap-3 text-[var(--error)] font-bold text-sm tracking-widest animate-pulse">
+                {isOverBufferLimit && (
+                    <div className="mt-6 flex items-center justify-center gap-3 text-[var(--error)] font-bold text-sm tracking-widest">
                         <AlertTriangle size={18} />
-                        CRITICAL ERROR: BUFFER OVERFLOW. CORRECT PREVIOUS INPUT.
+                        DETECTION: INPUT BUFFER LIMIT EXCEEDED. SYNC REQUIRED.
                     </div>
                 )}
             </div>

@@ -48,58 +48,30 @@ const HeroSection: React.FC = () => {
     };
 
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center pt-20 pb-20 px-4 text-center relative z-10">
+    <section className="min-h-screen flex flex-col items-center justify-center pt-12 pb-12 px-4 text-center relative z-10">
 
       {/* Hero Content */}
-      <div className="max-w-5xl mb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[var(--primary)] bg-[var(--bg-primary-hover)] text-[var(--primary)] font-mono text-xs mb-6 animate-pulse">
+      <div className="max-w-5xl mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[var(--primary)] bg-[var(--bg-primary-hover)] text-[var(--primary)] font-mono text-xs mb-6">
           <Terminal size={12} />
           <span>SYSTEM ONLINE // READY FOR INPUT</span>
         </div>
 
-        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black uppercase tracking-tighter leading-none mb-6 text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tighter leading-none mb-4 text-white drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
           Master the <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] drop-shadow-[0_0_10px_rgba(0,243,255,0.3)]">
             Digital Flow
           </span>
         </h1>
 
-        <p className="text-xl sm:text-2xl font-mono text-[var(--text-secondary)] max-w-2xl mx-auto mb-10">
+        <p className="text-lg sm:text-xl font-mono text-[var(--text-secondary)] max-w-2xl mx-auto mb-8">
           The ultimate competitive typing protocol. <br />
           <span className="text-white">Speed is your only currency.</span>
         </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <Link href="/solo-race">
-            <CyberButton size="lg" glow className="text-xl px-12 py-6">
-              <Play size={24} />
-              <span>Initiate Race</span>
-            </CyberButton>
-          </Link>
-
-          <Link href="/register">
-            <CyberButton variant="secondary" size="lg" className="text-xl px-12 py-6">
-              <span>Create Profile</span>
-            </CyberButton>
-          </Link>
-        </div>
       </div>
 
-      {/* Stats Bar */}
-      <div className="flex items-center gap-4 text-[var(--text-secondary)] font-mono text-sm mb-20 bg-black/40 px-6 py-3 rounded-full border border-[var(--border)] backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={16} className="text-[var(--success)]" />
-          <span className="text-white font-bold">128</span>
-          <span>ACTIVE PILOTS</span>
-        </div>
-        <span className="text-[var(--border)]">|</span>
-        <div>
-          RECORD: <span className="text-[var(--primary)] font-bold">150 WPM</span>
-        </div>
-      </div>
-
-      {/* Feature Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+      {/* Feature Grid - Now Primary Action Area */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto mb-12">
         {actionCards.map((card) => (
           <Link 
             key={card.title} 
@@ -138,6 +110,25 @@ const HeroSection: React.FC = () => {
             </CyberCard>
           </Link>
         ))}
+      </div>
+
+      <div className="flex flex-col items-center gap-6">
+          <Link href="/register" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors font-mono text-xs uppercase tracking-[0.2em]">
+            <span>[ Initialize Personal Profile_ ]</span>
+          </Link>
+
+          {/* Stats Bar - Subliminal footer of hero */}
+          <div className="flex items-center gap-4 text-[var(--text-secondary)] font-mono text-[10px] bg-black/40 px-6 py-2 rounded-full border border-[var(--border)] backdrop-blur-sm opacity-60">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={12} className="text-[var(--success)]" />
+              <span className="text-white font-bold">128</span>
+              <span>ACTIVE PILOTS</span>
+            </div>
+            <span className="text-[var(--border)]">|</span>
+            <div>
+              RECORD: <span className="text-[var(--primary)] font-bold">150 WPM</span>
+            </div>
+          </div>
       </div>
 
     </section>

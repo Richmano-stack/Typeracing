@@ -9,10 +9,11 @@ import * as RedisRoomService from "@/lib/multiplayer/redis-room-service";
 describe("Lobby Housekeeping (Heartbeat & Timeouts)", () => {
     const HOST_ID = "host-123";
     const GUEST_ID = "guest-456";
-    const ROOM_ID = "housekeeping-room";
+    let ROOM_ID = "";
 
     beforeEach(async () => {
         await redis.flushdb();
+        ROOM_ID = `hk-room-${Math.random().toString(36).substring(7)}`;
     });
 
     afterAll(async () => {

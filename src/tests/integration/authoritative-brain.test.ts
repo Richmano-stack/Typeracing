@@ -7,9 +7,9 @@ import * as saveRoute from "@/app/api/race/(multiplayer)/save/route";
 import * as RedisRoomService from "@/lib/multiplayer/redis-room-service";
 
 describe("Authoritative Brain (Sync Service)", () => {
-    const ROOM_ID = "brain-test-room";
     const HOST_ID = "550e8400-e29b-41d4-a716-446655440000";
     const GUEST_ID = "550e8400-e29b-41d4-a716-446655440001";
+    let ROOM_ID = "";
     let testPromptId = "";
 
     beforeAll(async () => {
@@ -26,6 +26,7 @@ describe("Authoritative Brain (Sync Service)", () => {
 
     beforeEach(async () => {
         await redis.flushdb();
+        ROOM_ID = `brain-room-${Math.random().toString(36).substring(7)}`;
     });
 
     afterAll(async () => {

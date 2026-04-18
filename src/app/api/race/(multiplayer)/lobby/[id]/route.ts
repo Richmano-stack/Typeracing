@@ -18,8 +18,10 @@ export async function GET(
   try {
     const { id: roomId } = await params;
 
-    if (!roomId) {
-      return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+    // Ensure roomId is defined and not an empty string
+    if (!roomId || typeof roomId !== 'string' || roomId.trim() === '') {
+      console.warn(`[Lobby Sync Warning] Invalid roomId detected: ${roomId}`);
+      return NextResponse.json({ error: "Invalid or missing roomId" }, { status: 400 });
     }
 
     // 1. Session & Identity Identification
