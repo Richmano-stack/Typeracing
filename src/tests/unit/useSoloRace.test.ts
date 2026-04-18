@@ -58,7 +58,7 @@ describe("useSoloRace Hook - 5-Character Error Buffer", () => {
         expect(result.totalCharactersInserted).toBe(2);
     });
 
-    it("verifies that the user is blocked exactly at currentIndex + 5 during an error", () => {
+    it("verifies that the user captures input but triggers isOverBufferLimit at currentIndex + 5 during an error", () => {
         let result = renderHook("apple");
         
         // currentIndex: 0
@@ -76,13 +76,15 @@ describe("useSoloRace Hook - 5-Character Error Buffer", () => {
         expect(result.currentIndex).toBe(0);
         expect(result.userInput).toBe("12345");
         expect(result.totalCharactersInserted).toBe(5);
+        expect(result.isOverBufferLimit).toBe(true);
 
-        // Attempt 6th character - should be blocked
+        // Attempt 6th character - should NOT be blocked in soft-block, but still over limit
         result.handleKey("6");
         result = renderHook("apple");
         
-        expect(result.userInput).toBe("12345"); // Still 5
-        expect(result.totalCharactersInserted).toBe(6); // Telemetry still increments for attempt
+        expect(result.userInput).toBe("123456"); 
+        expect(result.isOverBufferLimit).toBe(true);
+        expect(result.totalCharactersInserted).toBe(6);
     });
 
     it("verifies that Backspace removes characters and totalCharactersInserted does not decrease", () => {

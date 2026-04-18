@@ -35,11 +35,9 @@ export function useSoloRace(text: string) {
         // Telemetry: increment on every printable character attempt
         setTotalCharactersInserted((prev) => prev + 1);
 
-        // 5-Character Error Buffer Rule:
-        // Block if userInput.length === currentIndex + 5
-        if (userInput.length >= currentIndex + 5) {
-            return false;
-        }
+        // 5-Character Soft Error Buffer Rule:
+        // Exposing if the buffer is over the limit, but instead of blocking, we still allow input.
+        // Wait, if userInput.length >= currentIndex + 5, we should probably still allow it to grow so backspace memory works.
 
         let isFirstChar = false;
         const newUserInput = userInput + key;
@@ -60,6 +58,8 @@ export function useSoloRace(text: string) {
         return isFirstChar;
     }, [userInput, currentIndex, status, text]);
 
+    const isOverBufferLimit = userInput.length >= currentIndex + 5 && currentIndex < text?.length;
+
     const reset = useCallback(() => {
         setUserInput('');
         setTotalCharactersInserted(0);
@@ -72,6 +72,7 @@ export function useSoloRace(text: string) {
         totalCharsTyped: totalCharactersInserted,
         totalCharactersInserted,
         status,
+        isOverBufferLimit,
         handleKey,
         reset,
     };
